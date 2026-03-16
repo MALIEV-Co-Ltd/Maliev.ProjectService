@@ -1,0 +1,8 @@
+{
+  "Maliev.Aspire.ServiceDefaults, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.Aspire\\Maliev.Aspire.ServiceDefaults",
+  "Maliev.MessagingContracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.MessagingContracts\\generated\\csharp",
+  "Maliev.ProjectService.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.ProjectService\\Maliev.ProjectService.Api",
+  "Maliev.ProjectService.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.ProjectService\\Maliev.ProjectService.Application",
+  "Maliev.ProjectService.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.ProjectService\\Maliev.ProjectService.Domain",
+  "Maliev.ProjectService.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "B:\\maliev\\Maliev.ProjectService\\Maliev.ProjectService.Infrastructure"
+}
