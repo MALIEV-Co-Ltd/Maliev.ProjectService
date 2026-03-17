@@ -8,7 +8,9 @@ namespace Maliev.ProjectService.Tests.Integration;
 /// <summary>
 /// Integration tests for the <c>ProjectsController</c>.
 /// Tests the full HTTP stack against real PostgreSQL (Testcontainers).
+/// Requires Docker — skip with: dotnet test --filter "Category!=Integration"
 /// </summary>
+[Trait("Category", "Integration")]
 public class ProjectsControllerTests : BaseIntegrationTest
 {
     /// <inheritdoc />
