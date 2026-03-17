@@ -13,7 +13,7 @@ namespace Maliev.ProjectService.Api.Controllers;
 /// Manages project lifecycle — from initial file upload through quoting, production, and delivery.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("project/v{version:apiVersion}/projects")]
 public class ProjectsController : ControllerBase
 {
