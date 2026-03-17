@@ -1,3 +1,5 @@
+using Maliev.MessagingContracts.Contracts.Projects;
+using Maliev.MessagingContracts.Contracts.Shared;
 using Maliev.ProjectService.Application.Abstractions;
 using Maliev.ProjectService.Application.DTOs;
 using Maliev.ProjectService.Domain.Entities;
@@ -75,13 +77,26 @@ public class ProjectManagementService : IProjectService
         _db.Projects.Add(project);
         await _db.SaveChangesAsync(ct);
 
-        await PublishEventSafeAsync(new
-        {
-            ProjectId = project.Id,
-            ProjectNumber = project.ProjectNumber,
-            CustomerId = project.CustomerId,
-            CreatedAt = project.CreatedAt
-        }, "ProjectCreated", ct);
+        await PublishEventSafeAsync(new ProjectCreatedEvent(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "ProjectCreatedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "ProjectService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  project.Id,
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new ProjectCreatedEventPayload(
+                ProjectId:    project.Id,
+                ProjectNumber: project.ProjectNumber,
+                CustomerId:   project.CustomerId,
+                CustomerName: project.CustomerName,
+                CreatedBy:    principalId,
+                CreatedAt:    project.CreatedAt
+            )
+        ), "ProjectCreated", ct);
 
         _logger.LogInformation("Project {ProjectNumber} created by {PrincipalId}", projectNumber, principalId);
         return project.ToDetailResponse();
@@ -430,13 +445,28 @@ public class ProjectManagementService : IProjectService
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
 
-        await PublishEventSafeAsync(new
-        {
-            ProjectId = project.Id,
-            QuotationId = created.QuotationId,
-            TotalAmount = project.TotalEstimatedPrice,
-            GeneratedAt = DateTime.UtcNow
-        }, "ProjectQuotationGenerated", ct);
+        await PublishEventSafeAsync(new ProjectQuotationGeneratedEvent(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "ProjectQuotationGeneratedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "ProjectService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  project.Id,
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new ProjectQuotationGeneratedEventPayload(
+                ProjectId:       project.Id,
+                ProjectNumber:   project.ProjectNumber,
+                QuotationId:     created.QuotationId,
+                QuotationNumber: created.QuotationNumber,
+                CustomerId:      project.CustomerId,
+                TotalAmount:     (double)project.TotalEstimatedPrice,
+                Currency:        project.Currency,
+                GeneratedAt:     DateTimeOffset.UtcNow
+            )
+        ), "ProjectQuotationGenerated", ct);
 
         _logger.LogInformation("Quotation {QuotationNumber} generated for project {ProjectNumber}",
             created.QuotationNumber, project.ProjectNumber);
@@ -485,23 +515,38 @@ public class ProjectManagementService : IProjectService
             .Where(p => p.Status != PartStatus.Removed)
             .ToList();
 
-        await PublishEventSafeAsync(new
-        {
-            ProjectId = project.Id,
-            QuotationId = project.QuotationId,
-            CustomerId = project.CustomerId,
-            Parts = activeParts.Select(p => new
-            {
-                p.Id,
-                Description = $"{p.FileName} — {p.ProcessType}",
-                p.Quantity,
-                UnitPrice = p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m,
-                ProcessType = p.ProcessType.ToString(),
-                p.MaterialId,
-                p.FileId
-            }).ToList(),
-            AcceptedAt = DateTime.UtcNow
-        }, "ProjectQuotationAccepted", ct);
+        await PublishEventSafeAsync(new ProjectQuotationAcceptedEvent(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "ProjectQuotationAcceptedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "ProjectService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  project.Id,
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new ProjectQuotationAcceptedEventPayload(
+                ProjectId:     project.Id,
+                ProjectNumber: project.ProjectNumber,
+                QuotationId:   project.QuotationId,
+                CustomerId:    project.CustomerId,
+                Currency:      project.Currency,
+                Parts: activeParts
+                    .Select(p => new ProjectQuotationAcceptedEventPayloadPartsItem(
+                        PartId:      p.Id,
+                        Description: $"{p.FileName} — {p.ProcessType}",
+                        Quantity:    p.Quantity,
+                        UnitPrice:   (double)(p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m),
+                        ProcessType: p.ProcessType.ToString(),
+                        MaterialId:  p.MaterialId,
+                        FileId:      p.FileId
+                    ))
+                    .ToArray(),
+                AcceptedAt: DateTimeOffset.UtcNow,
+                AcceptedBy: principalId
+            )
+        ), "ProjectQuotationAccepted", ct);
 
         _logger.LogInformation("Quotation for project {ProjectNumber} accepted by {PrincipalId}",
             project.ProjectNumber, principalId);
@@ -517,10 +562,31 @@ public class ProjectManagementService : IProjectService
 
         if (Enum.TryParse<ProjectStatus>(newStatus, ignoreCase: true, out var status))
         {
+            var oldStatus = project.Status.ToString();
             project.Status = status;
             project.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
             await InvalidateCacheAsync(projectId);
+
+            await PublishEventSafeAsync(new ProjectStatusChangedEvent(
+                MessageId:      Guid.NewGuid(),
+                MessageName:    "ProjectStatusChangedEvent",
+                MessageType:    MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy:    "ProjectService",
+                ConsumedBy:     Array.Empty<string>(),
+                CorrelationId:  projectId,
+                CausationId:    null,
+                OccurredAtUtc:  DateTimeOffset.UtcNow,
+                IsPublic:       false,
+                Payload: new ProjectStatusChangedEventPayload(
+                    ProjectId:     projectId,
+                    ProjectNumber: project.ProjectNumber,
+                    OldStatus:     oldStatus,
+                    NewStatus:     newStatus,
+                    ChangedAt:     DateTimeOffset.UtcNow
+                )
+            ), "ProjectStatusChanged", ct);
         }
     }
 

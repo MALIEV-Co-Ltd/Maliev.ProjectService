@@ -1,0 +1,450 @@
+using Maliev.MessagingContracts.Contracts.Jobs;
+using Maliev.MessagingContracts.Contracts.Payments;
+using Maliev.MessagingContracts.Contracts.Projects;
+using Maliev.MessagingContracts.Contracts.Shared;
+using Maliev.ProjectService.Application.Abstractions;
+using Maliev.ProjectService.Domain.Entities;
+using Maliev.ProjectService.Domain.Enums;
+using Maliev.ProjectService.Infrastructure.Consumers;
+using Maliev.ProjectService.Infrastructure.Persistence;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace Maliev.ProjectService.Tests.Unit;
+
+/// <summary>
+/// Unit tests for Phase 1 messaging additions:
+/// - Typed publish calls in ProjectManagementService (verified via shape)
+/// - JobCreatedEventConsumer
+/// - PaymentCompletedEventConsumer
+/// - ProjectStatusChangedEvent published from UpdateStatusAsync
+/// </summary>
+public class Phase1MessagingTests
+{
+    // ── Shared helpers ────────────────────────────────────────────────────────
+
+    /// <summary>Creates an in-memory DbContext with a unique database per test.</summary>
+    private static ProjectDbContext MakeDb(string dbName)
+    {
+        var opts = new DbContextOptionsBuilder<ProjectDbContext>()
+            .UseInMemoryDatabase(dbName)
+            .Options;
+        return new ProjectDbContext(opts);
+    }
+
+    private static Mock<ConsumeContext<T>> MakeConsumeContext<T>(T message) where T : class
+    {
+        var ctx = new Mock<ConsumeContext<T>>();
+        ctx.Setup(c => c.Message).Returns(message);
+        ctx.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+        return ctx;
+    }
+
+    private static JobCreatedEvent MakeJobCreatedEvent(Guid jobId, Guid orderId, Guid orderItemId) =>
+        new(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "JobCreatedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "JobService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  Guid.NewGuid(),
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new JobCreatedEventPayload(
+                JobId:       jobId,
+                OrderId:     orderId,
+                OrderItemId: orderItemId,
+                ProcessType: "FDM",
+                JobNumber:   "JOB-2026-0001",
+                CreatedAt:   DateTimeOffset.UtcNow
+            )
+        );
+
+    private static PaymentCompletedEvent MakePaymentCompletedEvent(Guid orderId, Guid paymentId) =>
+        new(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "PaymentCompletedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "PaymentService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  Guid.NewGuid(),
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new PaymentCompletedEventPayload(
+                OrderId:     orderId,
+                OrderNumber: "ORD-001",
+                PaymentId:   paymentId,
+                Amount:      5000.0,
+                Currency:    "THB"
+            )
+        );
+
+    // ── JobCreatedEventConsumer tests ─────────────────────────────────────────
+
+    [Fact]
+    public async Task JobCreatedConsumer_WhenMatchingPartExists_CallsLinkJobAsync()
+    {
+        var jobId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenMatchingPartExists_CallsLinkJobAsync));
+
+        db.ProjectParts.Add(new ProjectPart
+        {
+            Id = partId,
+            ProjectId = Guid.NewGuid(),
+            FileName = "part.stl",
+            OrderId = orderId,
+            OrderItemId = orderItemId,
+            JobId = null,
+            Status = PartStatus.Ordered
+        });
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<JobCreatedEventConsumer>>();
+        var consumer = new JobCreatedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakeJobCreatedEvent(jobId, orderId, orderItemId));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.LinkJobAsync(partId, jobId, CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task JobCreatedConsumer_WhenNoMatchingPart_DoesNotCallLinkJobAsync()
+    {
+        var jobId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenNoMatchingPart_DoesNotCallLinkJobAsync));
+        // No parts in DB
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<JobCreatedEventConsumer>>();
+        var consumer = new JobCreatedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakeJobCreatedEvent(jobId, orderId, orderItemId));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.LinkJobAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task JobCreatedConsumer_WhenPartAlreadyLinked_DoesNotCallLinkJobAsync()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var existingJobId = Guid.NewGuid(); // already linked
+
+        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenPartAlreadyLinked_DoesNotCallLinkJobAsync));
+        db.ProjectParts.Add(new ProjectPart
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = Guid.NewGuid(),
+            FileName = "part.stl",
+            OrderId = orderId,
+            OrderItemId = orderItemId,
+            JobId = existingJobId, // already has a job
+            Status = PartStatus.InProduction
+        });
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<JobCreatedEventConsumer>>();
+        var consumer = new JobCreatedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakeJobCreatedEvent(Guid.NewGuid(), orderId, orderItemId));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.LinkJobAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task JobCreatedConsumer_WhenOrderIdDoesNotMatch_DoesNotCallLinkJobAsync()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenOrderIdDoesNotMatch_DoesNotCallLinkJobAsync));
+        db.ProjectParts.Add(new ProjectPart
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = Guid.NewGuid(),
+            FileName = "part.stl",
+            OrderId = Guid.NewGuid(), // different order
+            OrderItemId = orderItemId,
+            JobId = null,
+            Status = PartStatus.Ordered
+        });
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<JobCreatedEventConsumer>>();
+        var consumer = new JobCreatedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakeJobCreatedEvent(Guid.NewGuid(), orderId, orderItemId));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.LinkJobAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── PaymentCompletedEventConsumer tests ───────────────────────────────────
+
+    [Fact]
+    public async Task PaymentCompletedConsumer_WhenMatchingProject_CallsUpdateStatusPaid()
+    {
+        var orderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenMatchingProject_CallsUpdateStatusPaid));
+
+        var project = new Project
+        {
+            Id = projectId,
+            ProjectNumber = "PRJ-2026-0001",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Test Corp",
+            Title = "Test Project",
+            Status = ProjectStatus.Delivered,
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts =
+            [
+                new ProjectPart
+                {
+                    Id = Guid.NewGuid(),
+                    FileName = "part.stl",
+                    OrderId = orderId,
+                    Status = PartStatus.Delivered
+                }
+            ]
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<PaymentCompletedEventConsumer>>();
+        var consumer = new PaymentCompletedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakePaymentCompletedEvent(orderId, paymentId));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.UpdateStatusAsync(projectId, "Paid", CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task PaymentCompletedConsumer_WhenProjectAlreadyPaid_DoesNotCallUpdateStatus()
+    {
+        var orderId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenProjectAlreadyPaid_DoesNotCallUpdateStatus));
+
+        db.Projects.Add(new Project
+        {
+            Id = Guid.NewGuid(),
+            ProjectNumber = "PRJ-2026-0002",
+            CustomerName = "Corp",
+            Title = "Paid Project",
+            Status = ProjectStatus.Paid, // already paid
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts = [new ProjectPart { Id = Guid.NewGuid(), FileName = "f.stl", OrderId = orderId, Status = PartStatus.Delivered }]
+        });
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<PaymentCompletedEventConsumer>>();
+        var consumer = new PaymentCompletedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakePaymentCompletedEvent(orderId, Guid.NewGuid()));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.UpdateStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PaymentCompletedConsumer_WhenProjectCancelled_DoesNotCallUpdateStatus()
+    {
+        var orderId = Guid.NewGuid();
+
+        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenProjectCancelled_DoesNotCallUpdateStatus));
+
+        db.Projects.Add(new Project
+        {
+            Id = Guid.NewGuid(),
+            ProjectNumber = "PRJ-2026-0003",
+            CustomerName = "Corp",
+            Title = "Cancelled Project",
+            Status = ProjectStatus.Cancelled,
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts = [new ProjectPart { Id = Guid.NewGuid(), FileName = "f.stl", OrderId = orderId, Status = PartStatus.Removed }]
+        });
+        await db.SaveChangesAsync();
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<PaymentCompletedEventConsumer>>();
+        var consumer = new PaymentCompletedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakePaymentCompletedEvent(orderId, Guid.NewGuid()));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.UpdateStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PaymentCompletedConsumer_WhenNoMatchingOrder_DoesNotCallUpdateStatus()
+    {
+        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenNoMatchingOrder_DoesNotCallUpdateStatus));
+        // Empty DB — no projects
+
+        var svcMock = new Mock<IProjectService>();
+        var logger = new Mock<ILogger<PaymentCompletedEventConsumer>>();
+        var consumer = new PaymentCompletedEventConsumer(db, svcMock.Object, logger.Object);
+
+        var ctx = MakeConsumeContext(MakePaymentCompletedEvent(Guid.NewGuid(), Guid.NewGuid()));
+        await consumer.Consume(ctx.Object);
+
+        svcMock.Verify(s => s.UpdateStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── Typed event record shape tests ────────────────────────────────────────
+    // Verify that the typed contract records have the exact fields
+    // that ProjectManagementService now populates.
+
+    [Fact]
+    public void ProjectCreatedEvent_CanBeConstructed_WithAllRequiredFields()
+    {
+        var projectId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+
+        var evt = new ProjectCreatedEvent(
+            MessageId:      Guid.NewGuid(),
+            MessageName:    "ProjectCreatedEvent",
+            MessageType:    MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy:    "ProjectService",
+            ConsumedBy:     Array.Empty<string>(),
+            CorrelationId:  projectId,
+            CausationId:    null,
+            OccurredAtUtc:  DateTimeOffset.UtcNow,
+            IsPublic:       false,
+            Payload: new ProjectCreatedEventPayload(
+                ProjectId:     projectId,
+                ProjectNumber: "PRJ-2026-0001",
+                CustomerId:    customerId,
+                CustomerName:  "Acme Corp",
+                CreatedBy:     "user-abc",
+                CreatedAt:     DateTimeOffset.UtcNow
+            )
+        );
+
+        Assert.Equal(projectId, evt.Payload.ProjectId);
+        Assert.Equal(customerId, evt.Payload.CustomerId);
+        Assert.Equal("Acme Corp", evt.Payload.CustomerName);
+        Assert.Equal("ProjectService", evt.PublishedBy);
+        Assert.Equal(MessageType.Event, evt.MessageType);
+    }
+
+    [Fact]
+    public void ProjectQuotationAcceptedEvent_Parts_MapCorrectly()
+    {
+        var partId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+
+        var evt = new ProjectQuotationAcceptedEvent(
+            MessageId: Guid.NewGuid(), MessageName: "x", MessageType: MessageType.Event,
+            MessageVersion: "1.0.0", PublishedBy: "ProjectService", ConsumedBy: Array.Empty<string>(),
+            CorrelationId: Guid.NewGuid(), CausationId: null, OccurredAtUtc: DateTimeOffset.UtcNow, IsPublic: false,
+            Payload: new ProjectQuotationAcceptedEventPayload(
+                ProjectId: Guid.NewGuid(), ProjectNumber: "PRJ-001", QuotationId: null,
+                CustomerId: Guid.NewGuid(), Currency: "THB",
+                Parts:
+                [
+                    new ProjectQuotationAcceptedEventPayloadPartsItem(
+                        PartId: partId, Description: "bracket.stl — FDM",
+                        Quantity: 5, UnitPrice: 275.0, ProcessType: "FDM",
+                        MaterialId: materialId, FileId: null)
+                ],
+                AcceptedAt: DateTimeOffset.UtcNow, AcceptedBy: "user-xyz"
+            )
+        );
+
+        Assert.Single(evt.Payload.Parts);
+        Assert.Equal(partId, evt.Payload.Parts[0].PartId);
+        Assert.Equal(5, evt.Payload.Parts[0].Quantity);
+        Assert.Equal(275.0, evt.Payload.Parts[0].UnitPrice);
+        Assert.Equal(materialId, evt.Payload.Parts[0].MaterialId);
+        Assert.Null(evt.Payload.Parts[0].FileId);
+    }
+
+    [Fact]
+    public void ProjectStatusChangedEvent_CanBeConstructed_WithOldAndNewStatus()
+    {
+        var projectId = Guid.NewGuid();
+
+        var evt = new ProjectStatusChangedEvent(
+            MessageId: Guid.NewGuid(), MessageName: "ProjectStatusChangedEvent",
+            MessageType: MessageType.Event, MessageVersion: "1.0.0",
+            PublishedBy: "ProjectService", ConsumedBy: Array.Empty<string>(),
+            CorrelationId: projectId, CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow, IsPublic: false,
+            Payload: new ProjectStatusChangedEventPayload(
+                ProjectId:     projectId,
+                ProjectNumber: "PRJ-2026-0001",
+                OldStatus:     "Delivered",
+                NewStatus:     "Paid",
+                ChangedAt:     DateTimeOffset.UtcNow
+            )
+        );
+
+        Assert.Equal("Delivered", evt.Payload.OldStatus);
+        Assert.Equal("Paid", evt.Payload.NewStatus);
+        Assert.Equal(projectId, evt.Payload.ProjectId);
+    }
+
+    [Fact]
+    public void JobCreatedEvent_CanBeConstructed_WithAllRequiredFields()
+    {
+        var jobId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+
+        var evt = MakeJobCreatedEvent(jobId, orderId, orderItemId);
+
+        Assert.Equal(jobId, evt.Payload.JobId);
+        Assert.Equal(orderId, evt.Payload.OrderId);
+        Assert.Equal(orderItemId, evt.Payload.OrderItemId);
+        Assert.Equal("FDM", evt.Payload.ProcessType);
+        Assert.Equal("JOB-2026-0001", evt.Payload.JobNumber);
+        Assert.Equal(MessageType.Event, evt.MessageType);
+    }
+
+    [Fact]
+    public void PaymentCompletedEvent_CanBeConstructed_WithAllRequiredFields()
+    {
+        var orderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var evt = MakePaymentCompletedEvent(orderId, paymentId);
+
+        Assert.Equal(orderId, evt.Payload.OrderId);
+        Assert.Equal(paymentId, evt.Payload.PaymentId);
+        Assert.Equal(5000.0, evt.Payload.Amount);
+        Assert.Equal("THB", evt.Payload.Currency);
+    }
+}

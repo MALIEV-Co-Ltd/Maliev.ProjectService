@@ -35,6 +35,8 @@ try
         x.AddConsumer<QuotationAcceptedEventConsumer>();
         x.AddConsumer<OrderCreatedEventConsumer>();
         x.AddConsumer<JobStatusChangedEventConsumer>();
+        x.AddConsumer<JobCreatedEventConsumer>();
+        x.AddConsumer<PaymentCompletedEventConsumer>();
     });
 
     builder.AddStandardCors();
