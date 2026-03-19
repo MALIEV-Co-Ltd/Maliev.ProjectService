@@ -171,5 +171,7 @@ public class ProjectPartConfiguration : IEntityTypeConfiguration<ProjectPart>
 
         builder.HasIndex(pp => pp.JobId)
             .HasDatabaseName("idx_project_parts_job_id");
+
+        builder.HasQueryFilter(pp => pp.Project == null || !pp.Project.IsDeleted);
     }
 }

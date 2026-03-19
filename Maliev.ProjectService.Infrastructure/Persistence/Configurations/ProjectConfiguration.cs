@@ -115,12 +115,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasMany(p => p.Parts)
             .WithOne(pp => pp.Project)
             .HasForeignKey(pp => pp.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Navigation: notes
         builder.HasMany(p => p.Notes)
             .WithOne(n => n.Project)
             .HasForeignKey(n => n.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

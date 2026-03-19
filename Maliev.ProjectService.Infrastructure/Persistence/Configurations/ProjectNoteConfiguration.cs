@@ -43,5 +43,7 @@ public class ProjectNoteConfiguration : IEntityTypeConfiguration<ProjectNote>
 
         builder.HasIndex(n => n.ProjectId)
             .HasDatabaseName("idx_project_notes_project_id");
+
+        builder.HasQueryFilter(n => n.Project == null || !n.Project.IsDeleted);
     }
 }

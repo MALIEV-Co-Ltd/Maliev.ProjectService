@@ -17,7 +17,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -376,7 +376,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Notes")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_notes_projects_project_id");
 
@@ -388,7 +388,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Parts")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_parts_projects_project_id");
 

@@ -58,7 +58,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         column: x => x.project_id,
                         principalTable: "projects",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -109,7 +109,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         column: x => x.project_id,
                         principalTable: "projects",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateIndex(
