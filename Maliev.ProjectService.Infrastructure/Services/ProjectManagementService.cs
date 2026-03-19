@@ -664,26 +664,24 @@ public class ProjectManagementService : IProjectService
         var now = DateTime.UtcNow;
         var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var activeTask = _db.Projects.CountAsync(
+        var activeCount = await _db.Projects.CountAsync(
             p => p.Status != ProjectStatus.Completed && p.Status != ProjectStatus.Cancelled, ct);
-        var configuringTask = _db.Projects.CountAsync(
+        var configuringCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.Draft || p.Status == ProjectStatus.Configuring, ct);
-        var quotedTask = _db.Projects.CountAsync(
+        var quotedCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.QuotationGenerated || p.Status == ProjectStatus.QuotationSent, ct);
-        var inProductionTask = _db.Projects.CountAsync(
+        var inProductionCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.InProduction || p.Status == ProjectStatus.QualityCheck, ct);
-        var completedThisMonthTask = _db.Projects.CountAsync(
+        var completedThisMonthCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.Completed && p.UpdatedAt >= startOfMonth, ct);
-
-        await Task.WhenAll(activeTask, configuringTask, quotedTask, inProductionTask, completedThisMonthTask);
 
         return new ProjectStatsResponse
         {
-            ActiveCount = activeTask.Result,
-            ConfiguringCount = configuringTask.Result,
-            QuotedCount = quotedTask.Result,
-            InProductionCount = inProductionTask.Result,
-            CompletedThisMonth = completedThisMonthTask.Result
+            ActiveCount = activeCount,
+            ConfiguringCount = configuringCount,
+            QuotedCount = quotedCount,
+            InProductionCount = inProductionCount,
+            CompletedThisMonth = completedThisMonthCount
         };
     }
 
