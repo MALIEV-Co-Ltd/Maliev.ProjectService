@@ -57,6 +57,9 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasIndex(p => p.Status)
             .HasDatabaseName("idx_projects_status");
 
+        builder.HasIndex(p => new { p.Status, p.UpdatedAt })
+            .HasDatabaseName("idx_projects_status_updated_at");
+
         builder.Property(p => p.QuotationId)
             .HasColumnName("quotation_id");
 

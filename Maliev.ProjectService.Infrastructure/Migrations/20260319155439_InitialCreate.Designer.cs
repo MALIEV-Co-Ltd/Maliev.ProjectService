@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ProjectService.Infrastructure.Migrations
 {
     [DbContext(typeof(ProjectDbContext))]
-    [Migration("20260318144719_InitialCreate")]
+    [Migration("20260319155439_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -139,6 +139,9 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("idx_projects_status");
+
+                    b.HasIndex("Status", "UpdatedAt")
+                        .HasDatabaseName("idx_projects_status_updated_at");
 
                     b.ToTable("projects", (string)null);
                 });

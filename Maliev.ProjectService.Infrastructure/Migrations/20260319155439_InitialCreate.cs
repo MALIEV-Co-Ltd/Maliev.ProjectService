@@ -147,6 +147,11 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                 name: "idx_projects_status",
                 table: "projects",
                 column: "status");
+
+            migrationBuilder.CreateIndex(
+                name: "idx_projects_status_updated_at",
+                table: "projects",
+                columns: new[] { "status", "updated_at" });
         }
 
         /// <inheritdoc />

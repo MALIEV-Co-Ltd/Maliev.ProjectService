@@ -137,6 +137,9 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("idx_projects_status");
 
+                    b.HasIndex("Status", "UpdatedAt")
+                        .HasDatabaseName("idx_projects_status_updated_at");
+
                     b.ToTable("projects", (string)null);
                 });
 
