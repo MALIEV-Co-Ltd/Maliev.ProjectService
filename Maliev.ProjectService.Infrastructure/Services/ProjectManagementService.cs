@@ -108,6 +108,7 @@ public class ProjectManagementService : IProjectService
         var project = await _db.Projects
             .Include(p => p.Parts)
             .Include(p => p.Notes)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == projectId, ct);
 
         return project?.ToDetailResponse();
@@ -690,7 +691,7 @@ public class ProjectManagementService : IProjectService
     private async Task<Project> GetProjectOrThrowAsync(Guid projectId, CancellationToken ct, bool includeParts = false)
     {
         var query = _db.Projects.AsQueryable();
-        if (includeParts) query = query.Include(p => p.Parts).Include(p => p.Notes);
+        if (includeParts) query = query.Include(p => p.Parts).Include(p => p.Notes).AsSplitQuery();
 
         var project = await query.FirstOrDefaultAsync(p => p.Id == projectId, ct);
         if (project is null)
