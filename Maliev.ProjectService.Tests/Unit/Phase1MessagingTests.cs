@@ -11,6 +11,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Testcontainers.PostgreSql;
 
 namespace Maliev.ProjectService.Tests.Unit;
 
@@ -21,17 +22,37 @@ namespace Maliev.ProjectService.Tests.Unit;
 /// - PaymentCompletedEventConsumer
 /// - ProjectStatusChangedEvent published from UpdateStatusAsync
 /// </summary>
-public class Phase1MessagingTests
+public class Phase1MessagingTests : IAsyncLifetime
 {
     // ── Shared helpers ────────────────────────────────────────────────────────
 
-    /// <summary>Creates an in-memory DbContext with a unique database per test.</summary>
-    private static ProjectDbContext MakeDb(string dbName)
+    private readonly PostgreSqlContainer _postgres =
+#pragma warning disable CS0618
+        new PostgreSqlBuilder().WithImage("postgres:18-alpine").Build();
+#pragma warning restore CS0618
+
+    /// <inheritdoc />
+    public async Task InitializeAsync()
     {
+        await _postgres.StartAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task DisposeAsync()
+    {
+        await _postgres.DisposeAsync();
+    }
+
+    /// <summary>Creates a PostgreSQL-backed DbContext for the current test.</summary>
+    private async Task<ProjectDbContext> MakeDbAsync()
+    {
+        var connectionString = _postgres.GetConnectionString();
         var opts = new DbContextOptionsBuilder<ProjectDbContext>()
-            .UseInMemoryDatabase(dbName)
+            .UseNpgsql(connectionString)
             .Options;
-        return new ProjectDbContext(opts);
+        var db = new ProjectDbContext(opts);
+        await db.Database.MigrateAsync();
+        return db;
     }
 
     private static Mock<ConsumeContext<T>> MakeConsumeContext<T>(T message) where T : class
@@ -95,17 +116,31 @@ public class Phase1MessagingTests
         var orderItemId = Guid.NewGuid();
         var partId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenMatchingPartExists_CallsLinkJobAsync));
+        await using var db = await MakeDbAsync();
 
-        db.ProjectParts.Add(new ProjectPart
+        db.Projects.Add(new Project
         {
-            Id = partId,
-            ProjectId = Guid.NewGuid(),
-            FileName = "part.stl",
-            OrderId = orderId,
-            OrderItemId = orderItemId,
-            JobId = null,
-            Status = PartStatus.Ordered
+            Id = Guid.NewGuid(),
+            ProjectNumber = "PRJ-2026-1001",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Test Corp",
+            Title = "Job part project",
+            Status = ProjectStatus.QuotationAccepted,
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts =
+            [
+                new ProjectPart
+                {
+                    Id = partId,
+                    FileName = "part.stl",
+                    OrderId = orderId,
+                    OrderItemId = orderItemId,
+                    JobId = null,
+                    Status = PartStatus.Ordered
+                }
+            ]
         });
         await db.SaveChangesAsync();
 
@@ -126,7 +161,7 @@ public class Phase1MessagingTests
         var orderId = Guid.NewGuid();
         var orderItemId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenNoMatchingPart_DoesNotCallLinkJobAsync));
+        await using var db = await MakeDbAsync();
         // No parts in DB
 
         var svcMock = new Mock<IProjectService>();
@@ -146,16 +181,30 @@ public class Phase1MessagingTests
         var orderItemId = Guid.NewGuid();
         var existingJobId = Guid.NewGuid(); // already linked
 
-        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenPartAlreadyLinked_DoesNotCallLinkJobAsync));
-        db.ProjectParts.Add(new ProjectPart
+        await using var db = await MakeDbAsync();
+        db.Projects.Add(new Project
         {
             Id = Guid.NewGuid(),
-            ProjectId = Guid.NewGuid(),
-            FileName = "part.stl",
-            OrderId = orderId,
-            OrderItemId = orderItemId,
-            JobId = existingJobId, // already has a job
-            Status = PartStatus.InProduction
+            ProjectNumber = "PRJ-2026-1002",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Test Corp",
+            Title = "Linked job project",
+            Status = ProjectStatus.InProduction,
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts =
+            [
+                new ProjectPart
+                {
+                    Id = Guid.NewGuid(),
+                    FileName = "part.stl",
+                    OrderId = orderId,
+                    OrderItemId = orderItemId,
+                    JobId = existingJobId, // already has a job
+                    Status = PartStatus.InProduction
+                }
+            ]
         });
         await db.SaveChangesAsync();
 
@@ -175,16 +224,30 @@ public class Phase1MessagingTests
         var orderId = Guid.NewGuid();
         var orderItemId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(JobCreatedConsumer_WhenOrderIdDoesNotMatch_DoesNotCallLinkJobAsync));
-        db.ProjectParts.Add(new ProjectPart
+        await using var db = await MakeDbAsync();
+        db.Projects.Add(new Project
         {
             Id = Guid.NewGuid(),
-            ProjectId = Guid.NewGuid(),
-            FileName = "part.stl",
-            OrderId = Guid.NewGuid(), // different order
-            OrderItemId = orderItemId,
-            JobId = null,
-            Status = PartStatus.Ordered
+            ProjectNumber = "PRJ-2026-1003",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Test Corp",
+            Title = "Different order project",
+            Status = ProjectStatus.QuotationAccepted,
+            Currency = "THB",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Parts =
+            [
+                new ProjectPart
+                {
+                    Id = Guid.NewGuid(),
+                    FileName = "part.stl",
+                    OrderId = Guid.NewGuid(), // different order
+                    OrderItemId = orderItemId,
+                    JobId = null,
+                    Status = PartStatus.Ordered
+                }
+            ]
         });
         await db.SaveChangesAsync();
 
@@ -207,7 +270,7 @@ public class Phase1MessagingTests
         var paymentId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenMatchingProject_CallsUpdateStatusPaid));
+        await using var db = await MakeDbAsync();
 
         var project = new Project
         {
@@ -249,7 +312,7 @@ public class Phase1MessagingTests
     {
         var orderId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenProjectAlreadyPaid_DoesNotCallUpdateStatus));
+        await using var db = await MakeDbAsync();
 
         db.Projects.Add(new Project
         {
@@ -280,7 +343,7 @@ public class Phase1MessagingTests
     {
         var orderId = Guid.NewGuid();
 
-        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenProjectCancelled_DoesNotCallUpdateStatus));
+        await using var db = await MakeDbAsync();
 
         db.Projects.Add(new Project
         {
@@ -309,7 +372,7 @@ public class Phase1MessagingTests
     [Fact]
     public async Task PaymentCompletedConsumer_WhenNoMatchingOrder_DoesNotCallUpdateStatus()
     {
-        await using var db = MakeDb(nameof(PaymentCompletedConsumer_WhenNoMatchingOrder_DoesNotCallUpdateStatus));
+        await using var db = await MakeDbAsync();
         // Empty DB — no projects
 
         var svcMock = new Mock<IProjectService>();

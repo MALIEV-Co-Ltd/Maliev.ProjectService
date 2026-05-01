@@ -108,6 +108,8 @@ public class ProjectManagementService : IProjectService
         var project = await _db.Projects
             .Include(p => p.Parts)
             .Include(p => p.Notes)
+            .AsNoTracking()
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == projectId, ct);
 
         return project?.ToDetailResponse();
@@ -399,7 +401,7 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
 
         var activeParts = project.Parts.Where(p => p.Status != PartStatus.Removed).ToList();
         var unconfirmed = activeParts.Where(p => p.Status < PartStatus.Confirmed).ToList();
@@ -499,7 +501,7 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
 
         if (project.Status != ProjectStatus.QuotationSent && project.Status != ProjectStatus.QuotationGenerated)
             throw new InvalidOperationException($"Project must have a sent quotation to be accepted. Current: {project.Status}");
@@ -687,10 +689,16 @@ public class ProjectManagementService : IProjectService
 
     // ─── Private Helpers ──────────────────────────────────────────────────────────
 
-    private async Task<Project> GetProjectOrThrowAsync(Guid projectId, CancellationToken ct, bool includeParts = false)
+    private async Task<Project> GetProjectOrThrowAsync(
+        Guid projectId,
+        CancellationToken ct,
+        bool includeParts = false,
+        bool includeNotes = false)
     {
         var query = _db.Projects.AsQueryable();
-        if (includeParts) query = query.Include(p => p.Parts).Include(p => p.Notes);
+        if (includeParts) query = query.Include(p => p.Parts);
+        if (includeNotes) query = query.Include(p => p.Notes);
+        if (includeParts && includeNotes) query = query.AsSplitQuery();
 
         var project = await query.FirstOrDefaultAsync(p => p.Id == projectId, ct);
         if (project is null)
