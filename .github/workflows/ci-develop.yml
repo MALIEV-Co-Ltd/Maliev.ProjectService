@@ -15,7 +15,7 @@ jobs:
 
       - name: Switch to PackageReference for Docker build
         run: |
-          VERSION_FORMAT="1.0.*-*"
+          VERSION_FORMAT="1.0.*-alpha*"
           find . -name "*.csproj" -type f -exec sed -i \
             's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="'$VERSION_FORMAT'" />|g' \
             {} +
