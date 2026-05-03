@@ -77,6 +77,10 @@ public static class MappingExtensions
             FileId = part.FileId,
             FileReference = part.FileReference,
             ThumbnailUrl = part.ThumbnailUrl,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            GlbStoragePath = part.GlbStoragePath,
+            OverlayPaths = new Dictionary<string, string>(part.OverlayPaths),
             ProcessType = part.ProcessType.ToString(),
             MaterialId = part.MaterialId,
             MaterialName = part.MaterialName,
@@ -85,6 +89,25 @@ public static class MappingExtensions
             FinishType = part.FinishType,
             Color = part.Color,
             Tolerance = part.Tolerance,
+            RoughnessCode = part.RoughnessCode,
+            MarkingType = part.MarkingType,
+            MarkingText = part.MarkingText,
+            DfmAcknowledged = part.DfmAcknowledged,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+            Certificates = [.. part.Certificates],
+            DrawingFiles = part.DrawingFiles.Select(ToAttachmentDto).ToList(),
+            SupplementaryFiles = part.SupplementaryFiles.Select(ToAttachmentDto).ToList(),
+            ProcessConfig = new Dictionary<string, string>(part.ProcessConfig),
+            BodyCount = part.BodyCount,
+            BodiesJson = part.BodiesJson,
+            SelectedBodyIndex = part.SelectedBodyIndex,
             ThreadsInserts = part.ThreadsInserts,
             CustomNotes = part.CustomNotes,
             VolumeCm3 = part.VolumeCm3,
@@ -103,6 +126,36 @@ public static class MappingExtensions
             Status = part.Status.ToString(),
             CreatedAt = part.CreatedAt,
             UpdatedAt = part.UpdatedAt
+        };
+    }
+
+    /// <summary>Maps a persisted attachment to its DTO representation.</summary>
+    public static ProjectPartAttachmentDto ToAttachmentDto(this ProjectPartAttachment attachment)
+    {
+        return new ProjectPartAttachmentDto
+        {
+            FileId = attachment.FileId,
+            FileName = attachment.FileName,
+            StoragePath = attachment.StoragePath,
+            SignedUrl = attachment.SignedUrl,
+            SizeBytes = attachment.SizeBytes,
+            ContentType = attachment.ContentType,
+            UploadedAt = attachment.UploadedAt
+        };
+    }
+
+    /// <summary>Maps an attachment DTO to a persisted attachment value.</summary>
+    public static ProjectPartAttachment ToAttachment(this ProjectPartAttachmentDto attachment)
+    {
+        return new ProjectPartAttachment
+        {
+            FileId = attachment.FileId,
+            FileName = attachment.FileName,
+            StoragePath = attachment.StoragePath,
+            SignedUrl = attachment.SignedUrl,
+            SizeBytes = attachment.SizeBytes,
+            ContentType = attachment.ContentType,
+            UploadedAt = attachment.UploadedAt
         };
     }
 

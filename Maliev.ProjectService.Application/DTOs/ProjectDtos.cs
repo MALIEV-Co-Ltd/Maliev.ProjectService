@@ -60,6 +60,35 @@ public class ProjectFilterRequest
     public string? Query { get; set; }
 }
 
+/// <summary>Attachment metadata for project part drawings and supplementary files.</summary>
+public class ProjectPartAttachmentDto
+{
+    /// <summary>UploadService file ID for the attachment.</summary>
+    public Guid? FileId { get; set; }
+
+    /// <summary>Original file name for display.</summary>
+    [MaxLength(500)]
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Raw GCS storage path for the attachment.</summary>
+    [MaxLength(1000)]
+    public string? StoragePath { get; set; }
+
+    /// <summary>Signed URL if one has been resolved by a caller.</summary>
+    [MaxLength(2000)]
+    public string? SignedUrl { get; set; }
+
+    /// <summary>Attachment size in bytes.</summary>
+    public long? SizeBytes { get; set; }
+
+    /// <summary>MIME content type.</summary>
+    [MaxLength(200)]
+    public string? ContentType { get; set; }
+
+    /// <summary>UTC upload timestamp.</summary>
+    public DateTime? UploadedAt { get; set; }
+}
+
 /// <summary>Request to add a part (file) to a project.</summary>
 public class AddProjectPartRequest
 {
@@ -73,6 +102,21 @@ public class AddProjectPartRequest
     /// <summary>GCS storage path (if already uploaded).</summary>
     [MaxLength(1000)]
     public string? FileReference { get; set; }
+
+    /// <summary>Raw GCS path for the small thumbnail artifact.</summary>
+    [MaxLength(1000)]
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the large thumbnail artifact.</summary>
+    [MaxLength(1000)]
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the GLB viewer artifact.</summary>
+    [MaxLength(1000)]
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
 
     /// <summary>Manufacturing process for this part.</summary>
     public ManufacturingProcess ProcessType { get; set; }
@@ -103,6 +147,71 @@ public class AddProjectPartRequest
     /// <summary>Dimensional tolerance.</summary>
     [MaxLength(100)]
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    [MaxLength(100)]
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Marking type selected for the part.</summary>
+    [MaxLength(100)]
+    public string? MarkingType { get; set; }
+
+    /// <summary>Marking text selected for the part.</summary>
+    [MaxLength(500)]
+    public string? MarkingText { get; set; }
+
+    /// <summary>Whether DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
+
+    /// <summary>Whether this part requires threaded holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    [MaxLength(200)]
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Threaded hole count.</summary>
+    [Range(0, 10000)]
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>Whether this part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type selected for this part.</summary>
+    [MaxLength(100)]
+    public string? InsertType { get; set; }
+
+    /// <summary>Insert count.</summary>
+    [Range(0, 10000)]
+    public int InsertCount { get; set; }
+
+    /// <summary>Whether this part should be individually bagged and tagged.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level selected for this part.</summary>
+    [MaxLength(100)]
+    public string? InspectionLevel { get; set; }
+
+    /// <summary>Requested certificates for this part.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Drawing attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
 
     /// <summary>Thread inserts or fastener requirements.</summary>
     [MaxLength(500)]
@@ -161,6 +270,86 @@ public class UpdateProjectPartRequest
     /// <summary>Tolerance.</summary>
     [MaxLength(100)]
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    [MaxLength(100)]
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Marking type selected for the part.</summary>
+    [MaxLength(100)]
+    public string? MarkingType { get; set; }
+
+    /// <summary>Marking text selected for the part.</summary>
+    [MaxLength(500)]
+    public string? MarkingText { get; set; }
+
+    /// <summary>Whether DFM warnings have been acknowledged.</summary>
+    public bool? DfmAcknowledged { get; set; }
+
+    /// <summary>Whether this part requires threaded holes.</summary>
+    public bool? HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    [MaxLength(200)]
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Threaded hole count.</summary>
+    [Range(0, 10000)]
+    public int? ThreadedHoleCount { get; set; }
+
+    /// <summary>Whether this part requires inserts.</summary>
+    public bool? HasInserts { get; set; }
+
+    /// <summary>Insert type selected for this part.</summary>
+    [MaxLength(100)]
+    public string? InsertType { get; set; }
+
+    /// <summary>Insert count.</summary>
+    [Range(0, 10000)]
+    public int? InsertCount { get; set; }
+
+    /// <summary>Whether this part should be individually bagged and tagged.</summary>
+    public bool? BagAndTag { get; set; }
+
+    /// <summary>Inspection level selected for this part.</summary>
+    [MaxLength(100)]
+    public string? InspectionLevel { get; set; }
+
+    /// <summary>Requested certificates for this part.</summary>
+    public List<string>? Certificates { get; set; }
+
+    /// <summary>Drawing attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto>? DrawingFiles { get; set; }
+
+    /// <summary>Supplementary attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto>? SupplementaryFiles { get; set; }
+
+    /// <summary>Dynamic process configuration selections.</summary>
+    public Dictionary<string, string>? ProcessConfig { get; set; }
+
+    /// <summary>Raw GCS path for the small thumbnail artifact.</summary>
+    [MaxLength(1000)]
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the large thumbnail artifact.</summary>
+    [MaxLength(1000)]
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the GLB viewer artifact.</summary>
+    [MaxLength(1000)]
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string>? OverlayPaths { get; set; }
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
 
     /// <summary>Thread inserts.</summary>
     [MaxLength(500)]
@@ -332,6 +521,18 @@ public class ProjectPartResponse
     /// <summary>Thumbnail URL for 3D preview.</summary>
     public string? ThumbnailUrl { get; set; }
 
+    /// <summary>Raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the GLB viewer artifact.</summary>
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
+
     // Configuration
     /// <summary>Manufacturing process name.</summary>
     public string ProcessType { get; set; } = string.Empty;
@@ -356,6 +557,63 @@ public class ProjectPartResponse
 
     /// <summary>Tolerance.</summary>
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Marking type selected for the part.</summary>
+    public string? MarkingType { get; set; }
+
+    /// <summary>Marking text selected for the part.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>Whether DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
+
+    /// <summary>Whether this part requires threaded holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Threaded hole count.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>Whether this part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type selected for this part.</summary>
+    public string? InsertType { get; set; }
+
+    /// <summary>Insert count.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>Whether this part should be individually bagged and tagged.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level selected for this part.</summary>
+    public string? InspectionLevel { get; set; }
+
+    /// <summary>Requested certificates for this part.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Drawing attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary attachments for this part.</summary>
+    public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
 
     /// <summary>Thread inserts.</summary>
     public string? ThreadsInserts { get; set; }

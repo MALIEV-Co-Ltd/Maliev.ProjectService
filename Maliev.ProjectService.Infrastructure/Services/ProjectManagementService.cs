@@ -218,6 +218,10 @@ public class ProjectManagementService : IProjectService
             FileName = request.FileName,
             FileId = request.FileId,
             FileReference = request.FileReference,
+            ThumbnailSmallGcsPath = request.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = request.ThumbnailLargeGcsPath,
+            GlbStoragePath = request.GlbStoragePath,
+            OverlayPaths = new Dictionary<string, string>(request.OverlayPaths),
             ProcessType = request.ProcessType,
             MaterialId = request.MaterialId,
             MaterialName = request.MaterialName,
@@ -226,6 +230,25 @@ public class ProjectManagementService : IProjectService
             FinishType = request.FinishType,
             Color = request.Color,
             Tolerance = request.Tolerance,
+            RoughnessCode = request.RoughnessCode,
+            MarkingType = request.MarkingType,
+            MarkingText = request.MarkingText,
+            DfmAcknowledged = request.DfmAcknowledged,
+            HasThreadedHoles = request.HasThreadedHoles,
+            ThreadedHoleSpec = request.ThreadedHoleSpec,
+            ThreadedHoleCount = request.ThreadedHoleCount,
+            HasInserts = request.HasInserts,
+            InsertType = request.InsertType,
+            InsertCount = request.InsertCount,
+            BagAndTag = request.BagAndTag,
+            InspectionLevel = request.InspectionLevel,
+            Certificates = [.. request.Certificates],
+            DrawingFiles = request.DrawingFiles.Select(attachment => attachment.ToAttachment()).ToList(),
+            SupplementaryFiles = request.SupplementaryFiles.Select(attachment => attachment.ToAttachment()).ToList(),
+            ProcessConfig = new Dictionary<string, string>(request.ProcessConfig),
+            BodyCount = request.BodyCount,
+            BodiesJson = request.BodiesJson,
+            SelectedBodyIndex = request.SelectedBodyIndex,
             ThreadsInserts = request.ThreadsInserts,
             CustomNotes = request.CustomNotes,
             VolumeCm3 = request.VolumeCm3,
@@ -278,6 +301,29 @@ public class ProjectManagementService : IProjectService
         if (request.FinishType is not null) part.FinishType = request.FinishType;
         if (request.Color is not null) part.Color = request.Color;
         if (request.Tolerance is not null) part.Tolerance = request.Tolerance;
+        if (request.RoughnessCode is not null) part.RoughnessCode = request.RoughnessCode;
+        if (request.MarkingType is not null) part.MarkingType = request.MarkingType;
+        if (request.MarkingText is not null) part.MarkingText = request.MarkingText;
+        if (request.DfmAcknowledged.HasValue) part.DfmAcknowledged = request.DfmAcknowledged.Value;
+        if (request.HasThreadedHoles.HasValue) part.HasThreadedHoles = request.HasThreadedHoles.Value;
+        if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
+        if (request.ThreadedHoleCount.HasValue) part.ThreadedHoleCount = request.ThreadedHoleCount.Value;
+        if (request.HasInserts.HasValue) part.HasInserts = request.HasInserts.Value;
+        if (request.InsertType is not null) part.InsertType = request.InsertType;
+        if (request.InsertCount.HasValue) part.InsertCount = request.InsertCount.Value;
+        if (request.BagAndTag.HasValue) part.BagAndTag = request.BagAndTag.Value;
+        if (request.InspectionLevel is not null) part.InspectionLevel = request.InspectionLevel;
+        if (request.Certificates is not null) part.Certificates = [.. request.Certificates];
+        if (request.DrawingFiles is not null) part.DrawingFiles = request.DrawingFiles.Select(attachment => attachment.ToAttachment()).ToList();
+        if (request.SupplementaryFiles is not null) part.SupplementaryFiles = request.SupplementaryFiles.Select(attachment => attachment.ToAttachment()).ToList();
+        if (request.ProcessConfig is not null) part.ProcessConfig = new Dictionary<string, string>(request.ProcessConfig);
+        if (request.ThumbnailSmallGcsPath is not null) part.ThumbnailSmallGcsPath = request.ThumbnailSmallGcsPath;
+        if (request.ThumbnailLargeGcsPath is not null) part.ThumbnailLargeGcsPath = request.ThumbnailLargeGcsPath;
+        if (request.GlbStoragePath is not null) part.GlbStoragePath = request.GlbStoragePath;
+        if (request.OverlayPaths is not null) part.OverlayPaths = new Dictionary<string, string>(request.OverlayPaths);
+        if (request.BodyCount.HasValue) part.BodyCount = request.BodyCount.Value;
+        if (request.BodiesJson is not null) part.BodiesJson = request.BodiesJson;
+        if (request.SelectedBodyIndex.HasValue) part.SelectedBodyIndex = request.SelectedBodyIndex.Value;
         if (request.ThreadsInserts is not null) part.ThreadsInserts = request.ThreadsInserts;
         if (request.CustomNotes is not null) part.CustomNotes = request.CustomNotes;
 
