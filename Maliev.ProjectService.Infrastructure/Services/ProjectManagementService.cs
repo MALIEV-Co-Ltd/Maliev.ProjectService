@@ -78,23 +78,23 @@ public class ProjectManagementService : IProjectService
         await _db.SaveChangesAsync(ct);
 
         await PublishEventSafeAsync(new ProjectCreatedEvent(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "ProjectCreatedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "ProjectCreatedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "ProjectService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  project.Id,
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "ProjectService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: project.Id,
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new ProjectCreatedEventPayload(
-                ProjectId:    project.Id,
+                ProjectId: project.Id,
                 ProjectNumber: project.ProjectNumber,
-                CustomerId:   project.CustomerId,
+                CustomerId: project.CustomerId,
                 CustomerName: project.CustomerName,
-                CreatedBy:    principalId,
-                CreatedAt:    project.CreatedAt
+                CreatedBy: principalId,
+                CreatedAt: project.CreatedAt
             )
         ), "ProjectCreated", ct);
 
@@ -502,25 +502,25 @@ public class ProjectManagementService : IProjectService
         await InvalidateCacheAsync(projectId);
 
         await PublishEventSafeAsync(new ProjectQuotationGeneratedEvent(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "ProjectQuotationGeneratedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "ProjectQuotationGeneratedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "ProjectService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  project.Id,
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "ProjectService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: project.Id,
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new ProjectQuotationGeneratedEventPayload(
-                ProjectId:       project.Id,
-                ProjectNumber:   project.ProjectNumber,
-                QuotationId:     created.QuotationId,
+                ProjectId: project.Id,
+                ProjectNumber: project.ProjectNumber,
+                QuotationId: created.QuotationId,
                 QuotationNumber: created.QuotationNumber,
-                CustomerId:      project.CustomerId,
-                TotalAmount:     (double)project.TotalEstimatedPrice,
-                Currency:        project.Currency,
-                GeneratedAt:     DateTimeOffset.UtcNow
+                CustomerId: project.CustomerId,
+                TotalAmount: (double)project.TotalEstimatedPrice,
+                Currency: project.Currency,
+                GeneratedAt: DateTimeOffset.UtcNow
             )
         ), "ProjectQuotationGenerated", ct);
 
@@ -572,31 +572,31 @@ public class ProjectManagementService : IProjectService
             .ToList();
 
         await PublishEventSafeAsync(new ProjectQuotationAcceptedEvent(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "ProjectQuotationAcceptedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "ProjectQuotationAcceptedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "ProjectService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  project.Id,
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "ProjectService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: project.Id,
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new ProjectQuotationAcceptedEventPayload(
-                ProjectId:     project.Id,
+                ProjectId: project.Id,
                 ProjectNumber: project.ProjectNumber,
-                QuotationId:   project.QuotationId,
-                CustomerId:    project.CustomerId,
-                Currency:      project.Currency,
+                QuotationId: project.QuotationId,
+                CustomerId: project.CustomerId,
+                Currency: project.Currency,
                 Parts: activeParts
                     .Select(p => new ProjectQuotationAcceptedEventPayloadPartsItem(
-                        PartId:      p.Id,
+                        PartId: p.Id,
                         Description: $"{p.FileName} — {p.ProcessType}",
-                        Quantity:    p.Quantity,
-                        UnitPrice:   (double)(p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m),
+                        Quantity: p.Quantity,
+                        UnitPrice: (double)(p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m),
                         ProcessType: p.ProcessType.ToString(),
-                        MaterialId:  p.MaterialId,
-                        FileId:      p.FileId
+                        MaterialId: p.MaterialId,
+                        FileId: p.FileId
                     ))
                     .ToArray(),
                 AcceptedAt: DateTimeOffset.UtcNow,
@@ -625,22 +625,22 @@ public class ProjectManagementService : IProjectService
             await InvalidateCacheAsync(projectId);
 
             await PublishEventSafeAsync(new ProjectStatusChangedEvent(
-                MessageId:      Guid.NewGuid(),
-                MessageName:    "ProjectStatusChangedEvent",
-                MessageType:    MessageType.Event,
+                MessageId: Guid.NewGuid(),
+                MessageName: "ProjectStatusChangedEvent",
+                MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
-                PublishedBy:    "ProjectService",
-                ConsumedBy:     Array.Empty<string>(),
-                CorrelationId:  projectId,
-                CausationId:    null,
-                OccurredAtUtc:  DateTimeOffset.UtcNow,
-                IsPublic:       false,
+                PublishedBy: "ProjectService",
+                ConsumedBy: Array.Empty<string>(),
+                CorrelationId: projectId,
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
                 Payload: new ProjectStatusChangedEventPayload(
-                    ProjectId:     projectId,
+                    ProjectId: projectId,
                     ProjectNumber: project.ProjectNumber,
-                    OldStatus:     oldStatus,
-                    NewStatus:     newStatus,
-                    ChangedAt:     DateTimeOffset.UtcNow
+                    OldStatus: oldStatus,
+                    NewStatus: newStatus,
+                    ChangedAt: DateTimeOffset.UtcNow
                 )
             ), "ProjectStatusChanged", ct);
         }
