@@ -57,15 +57,12 @@ try
     builder.Services.AddScoped<IProjectService, ProjectManagementService>();
 
     // External HTTP clients
-    builder.Services.AddHttpClient<IPricingServiceClient, PricingServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["PricingService:BaseUrl"] ?? "http://pricing-service");
-    }).AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
-
-    builder.Services.AddHttpClient<IQuotationServiceClient, QuotationServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["QuotationService:BaseUrl"] ?? "http://quotation-service");
-    }).AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
+    builder.AddAuthenticatedServiceClient<IPricingServiceClient, PricingServiceClient>(
+        "PricingService",
+        sourceServiceName: "project");
+    builder.AddAuthenticatedServiceClient<IQuotationServiceClient, QuotationServiceClient>(
+        "QuotationService",
+        sourceServiceName: "project");
 
     builder.Services.AddPermissionAuthorization();
     builder.AddIAMServiceClient("project");

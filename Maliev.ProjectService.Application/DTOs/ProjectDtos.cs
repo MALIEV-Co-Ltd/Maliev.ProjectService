@@ -617,11 +617,23 @@ public class QuotationLineItemRequest
     /// <summary>Part description (typically the filename + process).</summary>
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>MaterialService material identifier required by QuotationService.</summary>
+    public Guid MaterialServiceId { get; set; }
+
     /// <summary>Quantity.</summary>
     public int Quantity { get; set; }
 
+    /// <summary>Unit of measure for the quoted quantity.</summary>
+    public string UnitOfMeasure { get; set; } = "pcs";
+
     /// <summary>Confirmed unit price.</summary>
     public decimal UnitPrice { get; set; }
+
+    /// <summary>Manufacturing process selected for this line item.</summary>
+    public string? ManufacturingProcess { get; set; }
+
+    /// <summary>Additional quotation notes for this line item.</summary>
+    public string? Notes { get; set; }
 }
 
 /// <summary>Response after creating a quotation in QuotationService.</summary>

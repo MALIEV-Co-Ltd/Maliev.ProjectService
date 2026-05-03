@@ -1,7 +1,7 @@
+using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
 using Maliev.ProjectService.Application.Abstractions;
 using Maliev.ProjectService.Application.DTOs;
-using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
 
 namespace Maliev.ProjectService.Infrastructure.HttpClients;
 
@@ -25,30 +25,45 @@ public class QuotationServiceClient : IQuotationServiceClient
         CreateQuotationFromProjectRequest request,
         CancellationToken ct = default)
     {
-        // Map to QuotationService's expected create request format
         var payload = new
         {
             customerId = request.CustomerId,
             validityPeriodStart = request.ValidityPeriodStart,
             validityPeriodEnd = request.ValidityPeriodEnd,
             deliveryExpectations = request.DeliveryExpectations,
-            items = request.Items.Select(i => new
+            lineItems = request.Items.Select(i => new
             {
-                description = i.Description,
+                materialServiceId = i.MaterialServiceId,
                 quantity = i.Quantity,
-                unitPrice = i.UnitPrice
-            }).ToList(),
-            internalNote = request.InternalNote
+                unitOfMeasure = string.IsNullOrWhiteSpace(i.UnitOfMeasure) ? "pcs" : i.UnitOfMeasure,
+                unitPrice = i.UnitPrice,
+                manufacturingProcess = i.ManufacturingProcess,
+                notes = i.Notes ?? i.Description
+            }).ToList()
         };
 
         var response = await _httpClient.PostAsJsonAsync("/quotation/v1/quotations", payload, ct);
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<CreatedQuotationResponse>(ct);
+        var result = await response.Content.ReadFromJsonAsync<QuotationServiceCreateResponse>(ct);
         if (result is null)
             throw new InvalidOperationException("QuotationService returned an empty response.");
 
-        _logger.LogInformation("Quotation {QuotationNumber} created in QuotationService", result.QuotationNumber);
-        return result;
+        var quotation = new CreatedQuotationResponse
+        {
+            QuotationId = result.Id,
+            QuotationNumber = CreateQuotationNumber(result.Id)
+        };
+
+        _logger.LogInformation("Quotation {QuotationNumber} created in QuotationService", quotation.QuotationNumber);
+        return quotation;
+    }
+
+    private static string CreateQuotationNumber(Guid id) =>
+        $"Q-{id.ToString("N")[..8].ToUpperInvariant()}";
+
+    private sealed class QuotationServiceCreateResponse
+    {
+        public Guid Id { get; set; }
     }
 }

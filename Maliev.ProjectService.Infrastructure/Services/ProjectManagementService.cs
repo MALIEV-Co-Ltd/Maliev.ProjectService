@@ -412,6 +412,10 @@ public class ProjectManagementService : IProjectService
         if (!activeParts.Any())
             throw new InvalidOperationException("Project has no active parts. Add at least one part before generating a quotation.");
 
+        var partsMissingMaterial = activeParts.Where(p => !p.MaterialId.HasValue).ToList();
+        if (partsMissingMaterial.Any())
+            throw new InvalidOperationException($"{partsMissingMaterial.Count} part(s) do not have a material selected. Select materials before generating a quotation.");
+
         var start = DateTime.UtcNow.Date;
         var end = start.AddDays(request.ValidityDays);
 
@@ -424,9 +428,13 @@ public class ProjectManagementService : IProjectService
             InternalNote = $"Generated from project {project.ProjectNumber}",
             Items = activeParts.Select(p => new QuotationLineItemRequest
             {
-                Description = $"{p.FileName} — {p.ProcessType} ({p.MaterialName ?? "Unspecified material"})",
+                Description = $"{p.FileName} - {p.ProcessType} ({p.MaterialName ?? p.MaterialCode ?? "Unspecified material"})",
+                MaterialServiceId = p.MaterialId!.Value,
                 Quantity = p.Quantity,
-                UnitPrice = p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m
+                UnitOfMeasure = "pcs",
+                UnitPrice = p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m,
+                ManufacturingProcess = p.ProcessType.ToString(),
+                Notes = p.MaterialCode
             }).ToList()
         };
 
