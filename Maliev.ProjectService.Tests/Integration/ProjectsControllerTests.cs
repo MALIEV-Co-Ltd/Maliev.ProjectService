@@ -352,7 +352,12 @@ public class ProjectsControllerTests : BaseIntegrationTest
             new ConfirmPartPriceRequest());
 
         // Act: generate quotation
-        var quotationRequest = new GenerateQuotationRequest { ValidityDays = 30 };
+        var beforeQuoteResponse = await Client.GetAsync($"/project/v1/projects/{project.Id}");
+        beforeQuoteResponse.EnsureSuccessStatusCode();
+        var beforeQuoteProject = await beforeQuoteResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(beforeQuoteProject);
+
+        var quotationRequest = new GenerateQuotationRequest { ValidityDays = 30, BulkDiscountAmount = 5m };
         var response = await Client.PostAsJsonAsync(
             $"/project/v1/projects/{project.Id}/generate-quotation", quotationRequest);
 
@@ -362,6 +367,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal("QuotationGenerated", updatedProject.Status);
         Assert.NotNull(updatedProject.QuotationId);
         Assert.StartsWith("QUO-TEST-", updatedProject.QuotationNumber);
+        Assert.Equal(beforeQuoteProject.TotalEstimatedPrice - 5m, updatedProject.TotalEstimatedPrice);
     }
 
     [Fact]

@@ -491,6 +491,8 @@ public class ProjectManagementService : IProjectService
         project.QuotationNumber = created.QuotationNumber;
         project.ValidUntil = end;
         project.Status = ProjectStatus.QuotationGenerated;
+        var quotedSubtotal = activeParts.Sum(p => (p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m) * p.Quantity);
+        project.TotalEstimatedPrice = Math.Max(0m, quotedSubtotal - Math.Max(0m, request.BulkDiscountAmount));
         project.UpdatedAt = DateTime.UtcNow;
 
         foreach (var part in activeParts)
