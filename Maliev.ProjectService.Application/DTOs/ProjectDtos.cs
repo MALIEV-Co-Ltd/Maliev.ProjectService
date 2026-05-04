@@ -384,6 +384,10 @@ public class GenerateQuotationRequest
     /// <summary>Delivery expectations / lead time description.</summary>
     [MaxLength(1000)]
     public string? DeliveryExpectations { get; set; }
+
+    /// <summary>Automatic bulk-order discount amount to display and apply to the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal BulkDiscountAmount { get; set; }
 }
 
 /// <summary>Request to add an internal note to a project.</summary>
@@ -864,6 +868,9 @@ public class CreateQuotationFromProjectRequest
 
     /// <summary>Line items from confirmed project parts.</summary>
     public List<QuotationLineItemRequest> Items { get; set; } = [];
+
+    /// <summary>Automatic bulk-order discount amount to display and apply to the quotation.</summary>
+    public decimal BulkDiscountAmount { get; set; }
 
     /// <summary>Internal note to attach to the quotation.</summary>
     public string? InternalNote { get; set; }

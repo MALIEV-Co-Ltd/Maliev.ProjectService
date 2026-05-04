@@ -471,6 +471,7 @@ public class ProjectManagementService : IProjectService
             ValidityPeriodStart = start,
             ValidityPeriodEnd = end,
             DeliveryExpectations = request.DeliveryExpectations,
+            BulkDiscountAmount = Math.Max(0m, request.BulkDiscountAmount),
             InternalNote = $"Generated from project {project.ProjectNumber}",
             Items = activeParts.Select(p => new QuotationLineItemRequest
             {

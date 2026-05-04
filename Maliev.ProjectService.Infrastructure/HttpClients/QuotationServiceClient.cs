@@ -31,6 +31,15 @@ public class QuotationServiceClient : IQuotationServiceClient
             validityPeriodStart = request.ValidityPeriodStart,
             validityPeriodEnd = request.ValidityPeriodEnd,
             deliveryExpectations = request.DeliveryExpectations,
+            discountStructure = request.BulkDiscountAmount > 0m
+                ? new
+                {
+                    discountType = 2,
+                    discountValue = request.BulkDiscountAmount,
+                    conditions = "Automatic bulk-order savings",
+                    authorizationReason = "System-calculated volume pricing discount"
+                }
+                : null,
             lineItems = request.Items.Select(i => new
             {
                 materialServiceId = i.MaterialServiceId,

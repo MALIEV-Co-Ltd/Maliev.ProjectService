@@ -48,6 +48,7 @@ public class QuotationServiceClientTests
             ValidityPeriodStart = DateTime.UtcNow.Date,
             ValidityPeriodEnd = DateTime.UtcNow.Date.AddDays(30),
             DeliveryExpectations = "Standard lead time",
+            BulkDiscountAmount = 150m,
             Items =
             [
                 new QuotationLineItemRequest
@@ -71,6 +72,9 @@ public class QuotationServiceClientTests
         var root = document.RootElement;
         Assert.True(root.TryGetProperty("lineItems", out var lineItems));
         Assert.False(root.TryGetProperty("items", out _));
+        Assert.True(root.TryGetProperty("discountStructure", out var discountStructure));
+        Assert.Equal(2, discountStructure.GetProperty("discountType").GetInt32());
+        Assert.Equal(150m, discountStructure.GetProperty("discountValue").GetDecimal());
         var item = lineItems[0];
         Assert.Equal(materialId, item.GetProperty("materialServiceId").GetGuid());
         Assert.Equal(2, item.GetProperty("quantity").GetInt32());
