@@ -144,6 +144,11 @@ public class ProjectPartConfiguration : IEntityTypeConfiguration<ProjectPart>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(pp => pp.HasDfmWarnings)
+            .HasColumnName("has_dfm_warnings")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(pp => pp.HasThreadedHoles)
             .HasColumnName("has_threaded_holes")
             .IsRequired()

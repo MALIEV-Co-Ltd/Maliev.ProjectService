@@ -163,6 +163,9 @@ public class AddProjectPartRequest
     /// <summary>Whether DFM warnings have been acknowledged.</summary>
     public bool DfmAcknowledged { get; set; }
 
+    /// <summary>Whether DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
+
     /// <summary>Whether this part requires threaded holes.</summary>
     public bool HasThreadedHoles { get; set; }
 
@@ -285,6 +288,9 @@ public class UpdateProjectPartRequest
 
     /// <summary>Whether DFM warnings have been acknowledged.</summary>
     public bool? DfmAcknowledged { get; set; }
+
+    /// <summary>Whether DFM warnings were detected for this part.</summary>
+    public bool? HasDfmWarnings { get; set; }
 
     /// <summary>Whether this part requires threaded holes.</summary>
     public bool? HasThreadedHoles { get; set; }
@@ -573,6 +579,9 @@ public class ProjectPartResponse
 
     /// <summary>Whether DFM warnings have been acknowledged.</summary>
     public bool DfmAcknowledged { get; set; }
+
+    /// <summary>Whether DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
 
     /// <summary>Whether this part requires threaded holes.</summary>
     public bool HasThreadedHoles { get; set; }

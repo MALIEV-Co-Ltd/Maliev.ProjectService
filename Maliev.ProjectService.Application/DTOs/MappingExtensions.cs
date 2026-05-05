@@ -93,6 +93,7 @@ public static class MappingExtensions
             MarkingType = part.MarkingType,
             MarkingText = part.MarkingText,
             DfmAcknowledged = part.DfmAcknowledged,
+            HasDfmWarnings = part.HasDfmWarnings,
             HasThreadedHoles = part.HasThreadedHoles,
             ThreadedHoleSpec = part.ThreadedHoleSpec,
             ThreadedHoleCount = part.ThreadedHoleCount,

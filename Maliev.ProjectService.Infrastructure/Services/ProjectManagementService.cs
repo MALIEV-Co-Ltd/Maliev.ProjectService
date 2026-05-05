@@ -234,6 +234,7 @@ public class ProjectManagementService : IProjectService
             MarkingType = request.MarkingType,
             MarkingText = request.MarkingText,
             DfmAcknowledged = request.DfmAcknowledged,
+            HasDfmWarnings = request.HasDfmWarnings,
             HasThreadedHoles = request.HasThreadedHoles,
             ThreadedHoleSpec = request.ThreadedHoleSpec,
             ThreadedHoleCount = request.ThreadedHoleCount,
@@ -305,6 +306,7 @@ public class ProjectManagementService : IProjectService
         if (request.MarkingType is not null) part.MarkingType = request.MarkingType;
         if (request.MarkingText is not null) part.MarkingText = request.MarkingText;
         if (request.DfmAcknowledged.HasValue) part.DfmAcknowledged = request.DfmAcknowledged.Value;
+        if (request.HasDfmWarnings.HasValue) part.HasDfmWarnings = request.HasDfmWarnings.Value;
         if (request.HasThreadedHoles.HasValue) part.HasThreadedHoles = request.HasThreadedHoles.Value;
         if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
         if (request.ThreadedHoleCount.HasValue) part.ThreadedHoleCount = request.ThreadedHoleCount.Value;

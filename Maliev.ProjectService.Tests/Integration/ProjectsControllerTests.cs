@@ -171,6 +171,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
             MarkingType = "Engraved",
             MarkingText = "PN-100",
             DfmAcknowledged = true,
+            HasDfmWarnings = true,
             HasThreadedHoles = true,
             ThreadedHoleSpec = "M6 x 1.0",
             ThreadedHoleCount = 4,
@@ -239,6 +240,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
             MarkingType = "Laser",
             MarkingText = "PN-100-R2",
             DfmAcknowledged = false,
+            HasDfmWarnings = false,
             HasThreadedHoles = true,
             ThreadedHoleSpec = "M8 x 1.25",
             ThreadedHoleCount = 6,
@@ -277,6 +279,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal("Ra0.8", partJson.GetProperty("roughnessCode").GetString());
         Assert.Equal("Laser", partJson.GetProperty("markingType").GetString());
         Assert.Equal("Cmm", partJson.GetProperty("inspectionLevel").GetString());
+        Assert.False(partJson.GetProperty("hasDfmWarnings").GetBoolean());
         Assert.Equal(2, partJson.GetProperty("overlayPaths").EnumerateObject().Count());
         Assert.Equal("Body_03", partJson.GetProperty("bodiesJson").GetString()!.Contains("Body_03", StringComparison.Ordinal) ? "Body_03" : "");
 
@@ -287,6 +290,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal("Laser", fetchedPart.MarkingType);
         Assert.Equal("PN-100-R2", fetchedPart.MarkingText);
         Assert.False(fetchedPart.DfmAcknowledged);
+        Assert.False(fetchedPart.HasDfmWarnings);
         Assert.Equal("M8 x 1.25", fetchedPart.ThreadedHoleSpec);
         Assert.Equal(6, fetchedPart.ThreadedHoleCount);
         Assert.Equal("PressFit", fetchedPart.InsertType);
@@ -442,6 +446,7 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal(expected.MarkingType, actual.MarkingType);
         Assert.Equal(expected.MarkingText, actual.MarkingText);
         Assert.Equal(expected.DfmAcknowledged, actual.DfmAcknowledged);
+        Assert.Equal(expected.HasDfmWarnings, actual.HasDfmWarnings);
         Assert.Equal(expected.ThreadedHoleSpec, actual.ThreadedHoleSpec);
         Assert.Equal(expected.ThreadedHoleCount, actual.ThreadedHoleCount);
         Assert.Equal(expected.InsertType, actual.InsertType);
