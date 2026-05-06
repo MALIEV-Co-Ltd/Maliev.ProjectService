@@ -27,6 +27,7 @@ public class ProjectSearchDocumentMapperTests
         Assert.Equal("ProjectService", projectDocument.Payload.SourceService);
         Assert.Equal(project.Id.ToString(), projectDocument.Payload.ResourceId);
         Assert.Equal("PRJ-2026-0001", projectDocument.Payload.Title);
+        Assert.Equal("Generated", projectDocument.Payload.Status);
         Assert.Equal("project.projects.read", projectDocument.Payload.RequiredPermission);
         Assert.Contains("d15-16.stp", projectDocument.Payload.Keywords);
         Assert.Contains("Polycarbonate", projectDocument.Payload.Keywords);

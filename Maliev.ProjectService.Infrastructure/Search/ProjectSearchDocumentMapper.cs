@@ -94,7 +94,7 @@ public static class ProjectSearchDocumentMapper
             subtitle,
             summary,
             CompactKeywords(keywords.ToArray()),
-            project.Status.ToString(),
+            FormatProjectStatus(project.Status),
             project.Id,
             occurredAtUtc);
     }
@@ -337,6 +337,17 @@ public static class ProjectSearchDocumentMapper
     private static string FormatProcess(ManufacturingProcess process)
     {
         return process.ToString().Replace("_", " ", StringComparison.Ordinal);
+    }
+
+    private static string FormatProjectStatus(ProjectStatus status)
+    {
+        return status switch
+        {
+            ProjectStatus.QuotationGenerated => "Generated",
+            ProjectStatus.QuotationSent => "Sent",
+            ProjectStatus.QuotationAccepted => "Accepted",
+            _ => status.ToString()
+        };
     }
 
     private static string? FormatDimensions(ProjectPart part)
