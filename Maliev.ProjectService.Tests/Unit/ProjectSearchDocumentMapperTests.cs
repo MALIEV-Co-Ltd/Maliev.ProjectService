@@ -35,7 +35,8 @@ public class ProjectSearchDocumentMapperTests
         var partDocument = Assert.Single(events, item => item.Payload.ResourceType == "project-part");
         Assert.Equal("d15-16.stp", partDocument.Payload.Title);
         Assert.Equal(ProjectSearchDocumentMapper.BuildPartResourceId(project.Id, project.Parts[0].Id), partDocument.Payload.ResourceId);
-        Assert.Contains("38 x 22 x 38 mm", partDocument.Payload.Keywords);
+        Assert.Equal("PRJ-2026-0001 - FDM - Polycarbonate - 38.00 x 22.35 x 38.00 mm", partDocument.Payload.Subtitle);
+        Assert.Contains("38.00 x 22.35 x 38.00 mm", partDocument.Payload.Keywords);
         Assert.Contains("FDM", partDocument.Payload.Keywords);
         Assert.Contains("Standard FDM settings", partDocument.Payload.Keywords);
         Assert.DoesNotContain("removed.stl", partDocument.Payload.Keywords);
@@ -101,8 +102,8 @@ public class ProjectSearchDocumentMapperTests
                     {
                         ["profile"] = "Standard FDM settings"
                     },
-                    BoundingBoxX = 38,
-                    BoundingBoxY = 22,
+                    BoundingBoxX = 37.9977m,
+                    BoundingBoxY = 22.345m,
                     BoundingBoxZ = 38,
                     ConfirmedUnitPrice = 540.27m,
                     Status = PartStatus.Quoted,

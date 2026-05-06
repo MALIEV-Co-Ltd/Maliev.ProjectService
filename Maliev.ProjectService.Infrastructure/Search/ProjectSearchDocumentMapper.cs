@@ -362,7 +362,7 @@ public static class ProjectSearchDocumentMapper
 
     private static string FormatNumber(decimal value)
     {
-        return value.ToString("0.####", CultureInfo.InvariantCulture);
+        return value.ToString("0.00", CultureInfo.InvariantCulture);
     }
 
     private static string? FormatPrice(ProjectPart part)
