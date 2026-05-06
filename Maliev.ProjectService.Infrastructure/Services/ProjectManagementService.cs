@@ -520,6 +520,10 @@ public class ProjectManagementService : IProjectService
             ValidityPeriodEnd = end,
             DeliveryExpectations = request.DeliveryExpectations,
             BulkDiscountAmount = Math.Max(0m, request.BulkDiscountAmount),
+            ManualDiscountAmount = Math.Max(0m, request.ManualDiscountAmount),
+            ShippingCost = Math.Max(0m, request.ShippingCost),
+            TaxAmount = Math.Max(0m, request.TaxAmount),
+            QuotationTerms = request.QuotationTerms,
             InternalNote = $"Generated from project {project.ProjectNumber}",
             Items = activeParts.Select(p => new QuotationLineItemRequest
             {
@@ -540,7 +544,12 @@ public class ProjectManagementService : IProjectService
         project.ValidUntil = end;
         project.Status = ProjectStatus.QuotationGenerated;
         var quotedSubtotal = activeParts.Sum(p => (p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m) * p.Quantity);
-        project.TotalEstimatedPrice = Math.Max(0m, quotedSubtotal - Math.Max(0m, request.BulkDiscountAmount));
+        var quotedDiscount = Math.Min(
+            quotedSubtotal,
+            Math.Max(0m, request.BulkDiscountAmount) + Math.Max(0m, request.ManualDiscountAmount));
+        project.TotalEstimatedPrice = Math.Max(
+            0m,
+            quotedSubtotal - quotedDiscount + Math.Max(0m, request.ShippingCost) + Math.Max(0m, request.TaxAmount));
         project.UpdatedAt = DateTime.UtcNow;
 
         foreach (var part in activeParts)

@@ -394,6 +394,22 @@ public class GenerateQuotationRequest
     /// <summary>Automatic bulk-order discount amount to display and apply to the quotation.</summary>
     [Range(0, (double)decimal.MaxValue)]
     public decimal BulkDiscountAmount { get; set; }
+
+    /// <summary>Manual discount amount to display and apply to the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Shipping or delivery cost to apply to the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal ShippingCost { get; set; }
+
+    /// <summary>VAT or tax amount calculated for the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>Customer-facing quotation terms shown on generated PDFs.</summary>
+    [MaxLength(2000)]
+    public string? QuotationTerms { get; set; }
 }
 
 /// <summary>Request to add an internal note to a project.</summary>
@@ -880,6 +896,18 @@ public class CreateQuotationFromProjectRequest
 
     /// <summary>Automatic bulk-order discount amount to display and apply to the quotation.</summary>
     public decimal BulkDiscountAmount { get; set; }
+
+    /// <summary>Manual discount amount to display and apply to the quotation.</summary>
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Shipping or delivery cost to apply to the quotation.</summary>
+    public decimal ShippingCost { get; set; }
+
+    /// <summary>VAT or tax amount calculated for the quotation.</summary>
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>Customer-facing quotation terms shown on generated PDFs.</summary>
+    public string? QuotationTerms { get; set; }
 
     /// <summary>Internal note to attach to the quotation.</summary>
     public string? InternalNote { get; set; }

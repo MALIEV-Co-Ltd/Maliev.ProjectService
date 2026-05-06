@@ -31,6 +31,10 @@ public class QuotationServiceClient : IQuotationServiceClient
             validityPeriodStart = request.ValidityPeriodStart,
             validityPeriodEnd = request.ValidityPeriodEnd,
             deliveryExpectations = request.DeliveryExpectations,
+            manualDiscountAmount = request.ManualDiscountAmount,
+            shippingCost = request.ShippingCost,
+            taxAmount = request.TaxAmount,
+            specialTerms = request.QuotationTerms,
             discountStructure = request.BulkDiscountAmount > 0m
                 ? new
                 {
