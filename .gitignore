@@ -2,6 +2,9 @@
 bin/
 obj/
 *.user
+*.csproj.user
+*.rsuser
+*.DotSettings.user
 *.suo
 .vs/
 *.userprefs
