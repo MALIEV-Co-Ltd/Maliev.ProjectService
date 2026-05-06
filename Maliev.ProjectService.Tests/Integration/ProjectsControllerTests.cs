@@ -147,6 +147,36 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task GetAll_WithPartFileQuery_ReturnsProjectContainingPart()
+    {
+        var project = await CreateTestProjectAsync();
+        var partRequest = new AddProjectPartRequest
+        {
+            FileName = "d15-16.stp",
+            FileReference = $"customers/{project.CustomerId}/projects/{project.Id}/source/d15-16.stp",
+            ProcessType = Domain.Enums.ManufacturingProcess.FDM,
+            MaterialId = Guid.NewGuid(),
+            MaterialName = "Polycarbonate",
+            MaterialCode = "PC",
+            Quantity = 12,
+            BoundingBoxX = 38m,
+            BoundingBoxY = 22m,
+            BoundingBoxZ = 38m,
+            IsManifold = true
+        };
+        var addResponse = await Client.PostAsJsonAsync($"/project/v1/projects/{project.Id}/parts", partRequest);
+        Assert.Equal(HttpStatusCode.Created, addResponse.StatusCode);
+
+        var response = await Client.GetAsync("/project/v1/projects?query=d15-16");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedProjectResponse>();
+        Assert.NotNull(result);
+        var match = Assert.Single(result.Data);
+        Assert.Equal(project.Id, match.Id);
+    }
+
+    [Fact]
     public async Task AddPart_UpdatePart_GetById_ReorderFields_RoundTripAndUseExpectedWireShape()
     {
         var project = await CreateTestProjectAsync();

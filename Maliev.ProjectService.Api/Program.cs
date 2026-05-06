@@ -37,6 +37,7 @@ try
         x.AddConsumer<JobStatusChangedEventConsumer>();
         x.AddConsumer<JobCreatedEventConsumer>();
         x.AddConsumer<PaymentCompletedEventConsumer>();
+        x.AddConsumer<SearchReindexRequestedConsumer>();
     });
 
     builder.AddStandardCors();

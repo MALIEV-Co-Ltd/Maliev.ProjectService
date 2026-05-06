@@ -5,6 +5,7 @@ using Maliev.ProjectService.Application.DTOs;
 using Maliev.ProjectService.Domain.Entities;
 using Maliev.ProjectService.Domain.Enums;
 using Maliev.ProjectService.Infrastructure.Persistence;
+using Maliev.ProjectService.Infrastructure.Search;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -98,6 +99,8 @@ public class ProjectManagementService : IProjectService
             )
         ), "ProjectCreated", ct);
 
+        await PublishSearchDocumentsSafeAsync(project, DateTimeOffset.UtcNow, ct);
+
         _logger.LogInformation("Project {ProjectNumber} created by {PrincipalId}", projectNumber, principalId);
         return project.ToDetailResponse();
     }
@@ -132,7 +135,19 @@ public class ProjectManagementService : IProjectService
             query = query.Where(p =>
                 p.ProjectNumber.ToLower().Contains(q) ||
                 p.Title.ToLower().Contains(q) ||
-                p.CustomerName.ToLower().Contains(q));
+                (p.Description != null && p.Description.ToLower().Contains(q)) ||
+                p.CustomerName.ToLower().Contains(q) ||
+                (p.QuotationNumber != null && p.QuotationNumber.ToLower().Contains(q)) ||
+                p.Parts.Any(part =>
+                    part.Status != PartStatus.Removed &&
+                    (part.FileName.ToLower().Contains(q) ||
+                    (part.FileReference != null && part.FileReference.ToLower().Contains(q)) ||
+                    (part.MaterialName != null && part.MaterialName.ToLower().Contains(q)) ||
+                    (part.MaterialCode != null && part.MaterialCode.ToLower().Contains(q)) ||
+                    (part.FinishType != null && part.FinishType.ToLower().Contains(q)) ||
+                    (part.Color != null && part.Color.ToLower().Contains(q)) ||
+                    (part.Tolerance != null && part.Tolerance.ToLower().Contains(q)) ||
+                    (part.CustomNotes != null && part.CustomNotes.ToLower().Contains(q)))));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Status) &&
@@ -176,6 +191,7 @@ public class ProjectManagementService : IProjectService
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         return project.ToDetailResponse();
     }
@@ -188,10 +204,30 @@ public class ProjectManagementService : IProjectService
         if (project.Status != ProjectStatus.Draft && project.Status != ProjectStatus.Configuring)
             throw new InvalidOperationException($"Project {project.ProjectNumber} cannot be deleted in {project.Status} status. Only Draft or Configuring projects may be deleted.");
 
+        var partIds = await _db.ProjectParts
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(part => part.ProjectId == projectId)
+            .Select(part => part.Id)
+            .ToListAsync(ct);
+        var occurredAtUtc = DateTimeOffset.UtcNow;
+
         project.IsDeleted = true;
         project.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+
+        await PublishEventSafeAsync(
+            ProjectSearchDocumentMapper.ToProjectDeletedEvent(projectId, occurredAtUtc),
+            "SearchDocumentDeleted",
+            ct);
+        foreach (var partId in partIds)
+        {
+            await PublishEventSafeAsync(
+                ProjectSearchDocumentMapper.ToPartDeletedEvent(projectId, partId, occurredAtUtc),
+                "SearchDocumentDeleted",
+                ct);
+        }
 
         _logger.LogInformation("Project {ProjectNumber} soft-deleted by {PrincipalId}", project.ProjectNumber, principalId);
     }
@@ -279,6 +315,7 @@ public class ProjectManagementService : IProjectService
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         return part.ToResponse();
     }
@@ -345,6 +382,7 @@ public class ProjectManagementService : IProjectService
         part.UpdatedAt = now;
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         return part.ToResponse();
     }
@@ -358,10 +396,16 @@ public class ProjectManagementService : IProjectService
             throw new InvalidOperationException($"Part '{part.FileName}' cannot be removed after an order has been placed.");
 
         part.Status = PartStatus.Removed;
-        part.UpdatedAt = DateTime.UtcNow;
+        var occurredAtUtc = DateTimeOffset.UtcNow;
+        part.UpdatedAt = occurredAtUtc.UtcDateTime;
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishEventSafeAsync(
+            ProjectSearchDocumentMapper.ToPartDeletedEvent(projectId, partId, occurredAtUtc),
+            "SearchDocumentDeleted",
+            ct);
+        await PublishSearchDocumentsSafeAsync(projectId, occurredAtUtc, ct);
     }
 
     /// <inheritdoc />
@@ -409,6 +453,7 @@ public class ProjectManagementService : IProjectService
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         _logger.LogInformation("Pricing for part {PartId} in project {ProjectId}: {Price} THB (confidence: {Confidence:P0})",
             partId, projectId, result.TotalUnitPrice, result.ConfidenceLevel);
@@ -438,6 +483,7 @@ public class ProjectManagementService : IProjectService
         await _db.SaveChangesAsync(ct);
         await RecalculateProjectTotalAsync(projectId, ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         return part.ToResponse();
     }
@@ -529,6 +575,8 @@ public class ProjectManagementService : IProjectService
             )
         ), "ProjectQuotationGenerated", ct);
 
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
         _logger.LogInformation("Quotation {QuotationNumber} generated for project {ProjectNumber}",
             created.QuotationNumber, project.ProjectNumber);
 
@@ -550,6 +598,7 @@ public class ProjectManagementService : IProjectService
         project.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
         return project.ToDetailResponse();
     }
@@ -609,6 +658,8 @@ public class ProjectManagementService : IProjectService
             )
         ), "ProjectQuotationAccepted", ct);
 
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
         _logger.LogInformation("Quotation for project {ProjectNumber} accepted by {PrincipalId}",
             project.ProjectNumber, principalId);
 
@@ -648,6 +699,8 @@ public class ProjectManagementService : IProjectService
                     ChangedAt: DateTimeOffset.UtcNow
                 )
             ), "ProjectStatusChanged", ct);
+
+            await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
         }
     }
 
@@ -675,6 +728,7 @@ public class ProjectManagementService : IProjectService
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
     }
 
     /// <inheritdoc />
@@ -689,6 +743,7 @@ public class ProjectManagementService : IProjectService
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(part.ProjectId);
+        await PublishSearchDocumentsSafeAsync(part.ProjectId, DateTimeOffset.UtcNow, ct);
     }
 
     /// <inheritdoc />
@@ -798,6 +853,35 @@ public class ProjectManagementService : IProjectService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to invalidate cache for project {ProjectId}", projectId);
+        }
+    }
+
+    private async Task PublishSearchDocumentsSafeAsync(Guid projectId, DateTimeOffset occurredAtUtc, CancellationToken ct)
+    {
+        try
+        {
+            var project = await _db.Projects
+                .AsNoTracking()
+                .Include(item => item.Parts.Where(part => part.Status != PartStatus.Removed))
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(item => item.Id == projectId, ct);
+
+            if (project is not null)
+            {
+                await PublishSearchDocumentsSafeAsync(project, occurredAtUtc, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load project {ProjectId} for search indexing", projectId);
+        }
+    }
+
+    private async Task PublishSearchDocumentsSafeAsync(Project project, DateTimeOffset occurredAtUtc, CancellationToken ct)
+    {
+        foreach (var message in ProjectSearchDocumentMapper.ToUpsertEvents(project, occurredAtUtc))
+        {
+            await PublishEventSafeAsync(message, "SearchDocumentUpserted", ct);
         }
     }
 
