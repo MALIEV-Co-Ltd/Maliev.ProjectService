@@ -88,6 +88,51 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task Create_WithCustomerScopeForDifferentCustomer_ShouldReturnForbidden()
+    {
+        var scopedCustomerId = Guid.NewGuid();
+        var scopedClient = Fixture.CreateClientWithPermissionsAndClaims(
+            new Dictionary<string, string> { ["customer_id"] = scopedCustomerId.ToString() },
+            "project.projects.create");
+        var request = new CreateProjectRequest
+        {
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Wrong Customer",
+            Title = "Cross-customer create attempt",
+            Currency = "THB"
+        };
+
+        var response = await scopedClient.PostAsJsonAsync("/project/v1/projects", request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAll_WithCustomerScope_ShouldReturnOnlyScopedCustomerProjects()
+    {
+        var scopedCustomerId = Guid.NewGuid();
+        var otherCustomerId = Guid.NewGuid();
+        var scopedProject = await CreateTestProjectAsync(scopedCustomerId);
+        var otherProject = await CreateTestProjectAsync(otherCustomerId);
+        var scopedClient = Fixture.CreateClientWithPermissionsAndClaims(
+            new Dictionary<string, string> { ["customer_id"] = scopedCustomerId.ToString() },
+            "project.projects.read");
+
+        var listResponse = await scopedClient.GetAsync("/project/v1/projects");
+        var ownResponse = await scopedClient.GetAsync($"/project/v1/projects/{scopedProject.Id}");
+        var otherResponse = await scopedClient.GetAsync($"/project/v1/projects/{otherProject.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        var result = await listResponse.Content.ReadFromJsonAsync<PaginatedProjectResponse>();
+        Assert.NotNull(result);
+        var match = Assert.Single(result.Data);
+        Assert.Equal(scopedProject.Id, match.Id);
+        Assert.Equal(scopedCustomerId, match.CustomerId);
+        Assert.Equal(HttpStatusCode.OK, ownResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, otherResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_ThenGetById_ShouldReturnSameProject()
     {
         var request = new CreateProjectRequest
@@ -431,11 +476,11 @@ public class ProjectsControllerTests : BaseIntegrationTest
 
     // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-    private async Task<ProjectDetailResponse> CreateTestProjectAsync()
+    private async Task<ProjectDetailResponse> CreateTestProjectAsync(Guid? customerId = null)
     {
         var request = new CreateProjectRequest
         {
-            CustomerId = Guid.NewGuid(),
+            CustomerId = customerId ?? Guid.NewGuid(),
             CustomerName = "Test Corp",
             Title = "Integration Test Project",
             Currency = "THB"

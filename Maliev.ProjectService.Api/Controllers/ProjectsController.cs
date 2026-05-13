@@ -39,6 +39,16 @@ public class ProjectsController : ControllerBase
         [FromQuery] string? query = null,
         CancellationToken ct = default)
     {
+        if (TryGetCustomerScope(out var scopedCustomerId))
+        {
+            if (customerId.HasValue && customerId.Value != scopedCustomerId)
+            {
+                return Forbid();
+            }
+
+            customerId = scopedCustomerId;
+        }
+
         var filter = new ProjectFilterRequest
         {
             Page = page,
@@ -61,6 +71,8 @@ public class ProjectsController : ControllerBase
     {
         var project = await _projectService.GetByIdAsync(id, ct);
         if (project is null) return NotFound();
+        if (IsOutsideCustomerScope(project.CustomerId)) return Forbid();
+
         return Ok(project);
     }
 
@@ -70,6 +82,8 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(typeof(PaginatedProjectResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<PaginatedProjectResponse>> GetByCustomer(Guid customerId, CancellationToken ct = default)
     {
+        if (IsOutsideCustomerScope(customerId)) return Forbid();
+
         var filter = new ProjectFilterRequest { CustomerId = customerId, PageSize = 100 };
         var result = await _projectService.SearchAsync(filter, ct);
         return Ok(result);
@@ -81,6 +95,8 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(typeof(ProjectStatsResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<ProjectStatsResponse>> GetStats(CancellationToken ct = default)
     {
+        if (TryGetCustomerScope(out _)) return Forbid();
+
         var stats = await _projectService.GetStatsAsync(ct);
         return Ok(stats);
     }
@@ -94,6 +110,8 @@ public class ProjectsController : ControllerBase
         [FromBody] CreateProjectRequest request,
         CancellationToken ct = default)
     {
+        if (IsOutsideCustomerScope(request.CustomerId)) return Forbid();
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? User.FindFirst("sub")?.Value
             ?? "unknown";
@@ -115,6 +133,9 @@ public class ProjectsController : ControllerBase
         [FromBody] UpdateProjectRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? User.FindFirst("sub")?.Value
             ?? "unknown";
@@ -131,6 +152,9 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? User.FindFirst("sub")?.Value
             ?? "unknown";
@@ -151,6 +175,9 @@ public class ProjectsController : ControllerBase
         [FromBody] AddProjectPartRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var part = await _projectService.AddPartAsync(id, request, principalId, ct);
         return StatusCode(StatusCodes.Status201Created, part);
@@ -167,6 +194,9 @@ public class ProjectsController : ControllerBase
         [FromBody] UpdateProjectPartRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var part = await _projectService.UpdatePartAsync(id, partId, request, principalId, ct);
         return Ok(part);
@@ -180,6 +210,9 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RemovePart(Guid id, Guid partId, CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         await _projectService.RemovePartAsync(id, partId, principalId, ct);
         return NoContent();
@@ -199,6 +232,9 @@ public class ProjectsController : ControllerBase
         Guid partId,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var part = await _projectService.RequestPricingAsync(id, partId, principalId, ct);
         return Ok(part);
@@ -216,6 +252,9 @@ public class ProjectsController : ControllerBase
         [FromBody] ConfirmPartPriceRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var part = await _projectService.ConfirmPriceAsync(id, partId, request, principalId, ct);
         return Ok(part);
@@ -237,6 +276,9 @@ public class ProjectsController : ControllerBase
         [FromBody] GenerateQuotationRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var project = await _projectService.GenerateQuotationAsync(id, request, principalId, ct);
         return Ok(project);
@@ -252,6 +294,9 @@ public class ProjectsController : ControllerBase
         Guid id,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var project = await _projectService.MarkQuotationSentAsync(id, principalId, ct);
         return Ok(project);
@@ -270,6 +315,9 @@ public class ProjectsController : ControllerBase
         Guid id,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var project = await _projectService.AcceptQuotationAsync(id, principalId, ct);
         return Ok(project);
@@ -287,9 +335,39 @@ public class ProjectsController : ControllerBase
         [FromBody] AddProjectNoteRequest request,
         CancellationToken ct = default)
     {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         var principalName = User.FindFirst("name")?.Value ?? "Unknown";
         var note = await _projectService.AddNoteAsync(id, request, principalId, principalName, ct);
         return StatusCode(StatusCodes.Status201Created, note);
+    }
+
+    private async Task<ActionResult?> EnsureProjectInCustomerScopeAsync(Guid projectId, CancellationToken ct)
+    {
+        if (!TryGetCustomerScope(out var scopedCustomerId))
+        {
+            return null;
+        }
+
+        var project = await _projectService.GetByIdAsync(projectId, ct);
+        if (project is null)
+        {
+            return NotFound();
+        }
+
+        return project.CustomerId == scopedCustomerId ? null : Forbid();
+    }
+
+    private bool IsOutsideCustomerScope(Guid customerId) =>
+        TryGetCustomerScope(out var scopedCustomerId) && customerId != scopedCustomerId;
+
+    private bool TryGetCustomerScope(out Guid customerId)
+    {
+        var rawCustomerId = User.FindFirst("customer_id")?.Value
+            ?? User.FindFirst("customerId")?.Value;
+
+        return Guid.TryParse(rawCustomerId, out customerId);
     }
 }

@@ -91,6 +91,8 @@ Use GCP-style permissions with plural resource format:
 | `project.projects.quote` | projects | GenerateQuotation |
 | `project.projects.accept` | projects | AcceptQuotation |
 
+Security boundary: these are staff/service permissions unless the bearer token has a `customer_id` or `customerId` claim. Customer-scoped tokens must be constrained to that customer for create/search/detail/mutation routes. Before changing a controller or DTO in this service, verify request DTOs, BFF proxy payloads, service DTOs, JSON names, and tests that assert the actual wire shape.
+
 ## 6. Events
 
 ### Consumed
