@@ -27,6 +27,13 @@ public class CreateProjectRequest
     /// <summary>Currency code. Defaults to THB.</summary>
     [MaxLength(3)]
     public string Currency { get; set; } = "THB";
+
+    /// <summary>Source project identifier when creating a duplicate/reorder project.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project number when creating a duplicate/reorder project.</summary>
+    [MaxLength(30)]
+    public string? SourceProjectNumber { get; set; }
 }
 
 /// <summary>Request to update project metadata.</summary>
@@ -410,6 +417,14 @@ public class GenerateQuotationRequest
     /// <summary>Customer-facing quotation terms shown on generated PDFs.</summary>
     [MaxLength(2000)]
     public string? QuotationTerms { get; set; }
+
+    /// <summary>Human-readable summary of the project changes captured in this quotation version.</summary>
+    [MaxLength(1000)]
+    public string? ChangeSummary { get; set; }
+
+    /// <summary>Optional idempotency key supplied by BFFs for duplicate submit protection.</summary>
+    [MaxLength(128)]
+    public string? IdempotencyKey { get; set; }
 }
 
 /// <summary>Request to add an internal note to a project.</summary>
@@ -458,6 +473,18 @@ public class ProjectSummaryResponse
     /// <summary>Quotation number (if generated).</summary>
     public string? QuotationNumber { get; set; }
 
+    /// <summary>Current quotation version ID (if generated).</summary>
+    public Guid? CurrentQuotationVersionId { get; set; }
+
+    /// <summary>Current quotation version number (if generated).</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
+    /// <summary>Source project identifier when this project was duplicated for reorder or revision work.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project number when this project was duplicated for reorder or revision work.</summary>
+    public string? SourceProjectNumber { get; set; }
+
     /// <summary>UTC timestamp of creation.</summary>
     public DateTime CreatedAt { get; set; }
 
@@ -494,6 +521,18 @@ public class ProjectDetailResponse
 
     /// <summary>Quotation number (if generated).</summary>
     public string? QuotationNumber { get; set; }
+
+    /// <summary>Current quotation version ID (if generated).</summary>
+    public Guid? CurrentQuotationVersionId { get; set; }
+
+    /// <summary>Current quotation version number (if generated).</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
+    /// <summary>Source project identifier when this project was duplicated for reorder or revision work.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project number when this project was duplicated for reorder or revision work.</summary>
+    public string? SourceProjectNumber { get; set; }
 
     /// <summary>Total estimated price.</summary>
     public decimal TotalEstimatedPrice { get; set; }
@@ -882,6 +921,15 @@ public class CreateQuotationFromProjectRequest
     /// <summary>Customer ID.</summary>
     public Guid CustomerId { get; set; }
 
+    /// <summary>Existing QuotationService quotation ID to update with a new immutable version.</summary>
+    public Guid? ExistingQuotationId { get; set; }
+
+    /// <summary>Source ProjectService project ID.</summary>
+    public Guid SourceProjectId { get; set; }
+
+    /// <summary>Source ProjectService project number.</summary>
+    public string SourceProjectNumber { get; set; } = string.Empty;
+
     /// <summary>Quotation validity start.</summary>
     public DateTime ValidityPeriodStart { get; set; }
 
@@ -908,6 +956,21 @@ public class CreateQuotationFromProjectRequest
 
     /// <summary>Customer-facing quotation terms shown on generated PDFs.</summary>
     public string? QuotationTerms { get; set; }
+
+    /// <summary>Immutable JSON snapshot of the project state being quoted.</summary>
+    public string? ProjectSnapshotJson { get; set; }
+
+    /// <summary>Deterministic hash of the immutable project snapshot.</summary>
+    public string? ProjectSnapshotHash { get; set; }
+
+    /// <summary>Human-readable display name for the quote generator.</summary>
+    public string? GeneratedByDisplayName { get; set; }
+
+    /// <summary>Human-readable summary of changes captured in this quotation version.</summary>
+    public string? ChangeSummary { get; set; }
+
+    /// <summary>Optional idempotency key supplied by BFFs for duplicate submit protection.</summary>
+    public string? IdempotencyKey { get; set; }
 
     /// <summary>Internal note to attach to the quotation.</summary>
     public string? InternalNote { get; set; }
@@ -946,4 +1009,13 @@ public class CreatedQuotationResponse
 
     /// <summary>Human-readable quotation number.</summary>
     public string QuotationNumber { get; set; } = string.Empty;
+
+    /// <summary>Current quotation version ID.</summary>
+    public Guid? CurrentVersionId { get; set; }
+
+    /// <summary>Current quotation version number.</summary>
+    public int? CurrentVersionNumber { get; set; }
+
+    /// <summary>Quotation total for the current version.</summary>
+    public decimal Total { get; set; }
 }

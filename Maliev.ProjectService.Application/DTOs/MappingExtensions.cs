@@ -24,6 +24,10 @@ public static class MappingExtensions
             Status = project.Status.ToString(),
             QuotationId = project.QuotationId,
             QuotationNumber = project.QuotationNumber,
+            CurrentQuotationVersionId = project.CurrentQuotationVersionId,
+            CurrentQuotationVersionNumber = project.CurrentQuotationVersionNumber,
+            SourceProjectId = project.SourceProjectId,
+            SourceProjectNumber = project.SourceProjectNumber,
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
             ValidUntil = project.ValidUntil,
@@ -60,6 +64,10 @@ public static class MappingExtensions
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
             QuotationNumber = project.QuotationNumber,
+            CurrentQuotationVersionId = project.CurrentQuotationVersionId,
+            CurrentQuotationVersionNumber = project.CurrentQuotationVersionNumber,
+            SourceProjectId = project.SourceProjectId,
+            SourceProjectNumber = project.SourceProjectNumber,
             CreatedAt = project.CreatedAt,
             CreatedByName = project.CreatedByName
         };

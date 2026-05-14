@@ -12,4 +12,9 @@ public interface IQuotationServiceClient
     /// Returns the created quotation ID and number.
     /// </summary>
     Task<CreatedQuotationResponse> CreateQuotationAsync(CreateQuotationFromProjectRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds a new immutable version to an existing QuotationService quotation.
+    /// </summary>
+    Task<CreatedQuotationResponse> UpdateQuotationAsync(Guid quotationId, CreateQuotationFromProjectRequest request, CancellationToken ct = default);
 }

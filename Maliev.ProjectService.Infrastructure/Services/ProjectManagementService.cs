@@ -10,6 +10,9 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace Maliev.ProjectService.Infrastructure.Services;
 
@@ -68,6 +71,8 @@ public class ProjectManagementService : IProjectService
             Description = request.Description,
             Status = ProjectStatus.Draft,
             Currency = request.Currency,
+            SourceProjectId = request.SourceProjectId,
+            SourceProjectNumber = string.IsNullOrWhiteSpace(request.SourceProjectNumber) ? null : request.SourceProjectNumber.Trim(),
             TotalEstimatedPrice = 0m,
             CreatedBy = principalId,
             CreatedByName = principalName,
@@ -240,6 +245,7 @@ public class ProjectManagementService : IProjectService
         CancellationToken ct = default)
     {
         var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        EnsureProjectAllowsCommercialChange(project);
 
         var nextPartNumber = project.Parts.Any()
             ? project.Parts.Max(p => p.PartNumber) + 1
@@ -328,6 +334,8 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
+        var project = await GetProjectOrThrowAsync(projectId, ct);
+        EnsureProjectAllowsCommercialChange(project);
         var part = await GetPartOrThrowAsync(projectId, partId, ct);
         var now = DateTime.UtcNow;
 
@@ -371,12 +379,17 @@ public class ProjectManagementService : IProjectService
             part.Status = PartStatus.Configured;
 
         // If configuration changed after pricing, reset to Configured (price may be stale)
-        if (part.Status == PartStatus.Priced || part.Status == PartStatus.Confirmed)
+        if (part.Status == PartStatus.Priced || part.Status == PartStatus.Confirmed || part.Status == PartStatus.Quoted)
         {
             part.AiSuggestedPrice = null;
             part.ConfirmedUnitPrice = null;
             part.PricingConfidence = null;
             part.Status = PartStatus.Configured;
+            if (project.Status == ProjectStatus.QuotationGenerated || project.Status == ProjectStatus.QuotationSent)
+            {
+                project.Status = ProjectStatus.Configuring;
+                project.UpdatedAt = now;
+            }
         }
 
         part.UpdatedAt = now;
@@ -390,6 +403,8 @@ public class ProjectManagementService : IProjectService
     /// <inheritdoc />
     public async Task RemovePartAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default)
     {
+        var project = await GetProjectOrThrowAsync(projectId, ct);
+        EnsureProjectAllowsCommercialChange(project);
         var part = await GetPartOrThrowAsync(projectId, partId, ct);
 
         if (part.Status >= PartStatus.Ordered)
@@ -417,6 +432,7 @@ public class ProjectManagementService : IProjectService
     {
         var part = await GetPartOrThrowAsync(projectId, partId, ct);
         var project = await GetProjectOrThrowAsync(projectId, ct);
+        EnsureProjectAllowsCommercialChange(project);
 
         if (part.ProcessType == default)
             throw new InvalidOperationException("Part must have a manufacturing process selected before requesting pricing.");
@@ -469,6 +485,8 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
+        var project = await GetProjectOrThrowAsync(projectId, ct);
+        EnsureProjectAllowsCommercialChange(project);
         var part = await GetPartOrThrowAsync(projectId, partId, ct);
 
         if (part.AiSuggestedPrice is null && request.ConfirmedUnitPrice is null)
@@ -496,6 +514,7 @@ public class ProjectManagementService : IProjectService
         CancellationToken ct = default)
     {
         var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
+        EnsureProjectAllowsCommercialChange(project);
 
         var activeParts = project.Parts.Where(p => p.Status != PartStatus.Removed).ToList();
         var unconfirmed = activeParts.Where(p => p.Status < PartStatus.Confirmed).ToList();
@@ -515,7 +534,10 @@ public class ProjectManagementService : IProjectService
 
         var quotationRequest = new CreateQuotationFromProjectRequest
         {
+            ExistingQuotationId = project.QuotationId,
             CustomerId = project.CustomerId,
+            SourceProjectId = project.Id,
+            SourceProjectNumber = project.ProjectNumber,
             ValidityPeriodStart = start,
             ValidityPeriodEnd = end,
             DeliveryExpectations = request.DeliveryExpectations,
@@ -524,6 +546,9 @@ public class ProjectManagementService : IProjectService
             ShippingCost = Math.Max(0m, request.ShippingCost),
             TaxAmount = Math.Max(0m, request.TaxAmount),
             QuotationTerms = request.QuotationTerms,
+            GeneratedByDisplayName = principalId,
+            ChangeSummary = ResolveQuotationChangeSummary(project, request),
+            IdempotencyKey = request.IdempotencyKey,
             InternalNote = $"Generated from project {project.ProjectNumber}",
             Items = activeParts.Select(p => new QuotationLineItemRequest
             {
@@ -536,18 +561,27 @@ public class ProjectManagementService : IProjectService
                 Notes = p.MaterialCode
             }).ToList()
         };
+        var snapshot = BuildProjectQuotationSnapshot(project, activeParts, quotationRequest, request, principalId);
+        quotationRequest.ProjectSnapshotJson = snapshot.Json;
+        quotationRequest.ProjectSnapshotHash = snapshot.Hash;
 
-        var created = await _quotationClient.CreateQuotationAsync(quotationRequest, ct);
+        var created = project.QuotationId.HasValue
+            ? await _quotationClient.UpdateQuotationAsync(project.QuotationId.Value, quotationRequest, ct)
+            : await _quotationClient.CreateQuotationAsync(quotationRequest, ct);
 
         project.QuotationId = created.QuotationId;
         project.QuotationNumber = created.QuotationNumber;
+        project.CurrentQuotationVersionId = created.CurrentVersionId;
+        project.CurrentQuotationVersionNumber = created.CurrentVersionNumber;
         project.ValidUntil = end;
         project.Status = ProjectStatus.QuotationGenerated;
         var quotedSubtotal = activeParts.Sum(p => (p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m) * p.Quantity);
         var quotedDiscount = Math.Min(
             quotedSubtotal,
             Math.Max(0m, request.BulkDiscountAmount) + Math.Max(0m, request.ManualDiscountAmount));
-        project.TotalEstimatedPrice = Math.Max(
+        project.TotalEstimatedPrice = created.Total > 0m
+            ? created.Total
+            : Math.Max(
             0m,
             quotedSubtotal - quotedDiscount + Math.Max(0m, request.ShippingCost) + Math.Max(0m, request.TaxAmount));
         project.UpdatedAt = DateTime.UtcNow;
@@ -811,6 +845,153 @@ public class ProjectManagementService : IProjectService
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────────
+
+    private static void EnsureProjectAllowsCommercialChange(Project project)
+    {
+        if (project.Status >= ProjectStatus.QuotationAccepted)
+        {
+            throw new InvalidOperationException(
+                $"Project {project.ProjectNumber} has been accepted or ordered. Duplicate the project before making reorder or revision changes.");
+        }
+    }
+
+    private static string ResolveQuotationChangeSummary(Project project, GenerateQuotationRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.ChangeSummary))
+        {
+            return request.ChangeSummary.Trim();
+        }
+
+        return project.QuotationId.HasValue
+            ? "Regenerated quotation from project state."
+            : "Initial quotation generated from project state.";
+    }
+
+    private static (string Json, string Hash) BuildProjectQuotationSnapshot(
+        Project project,
+        IReadOnlyCollection<ProjectPart> activeParts,
+        CreateQuotationFromProjectRequest quotationRequest,
+        GenerateQuotationRequest request,
+        string principalId)
+    {
+        var lineSubtotal = activeParts.Sum(p => (p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m) * p.Quantity);
+        var totalDiscount = Math.Min(
+            lineSubtotal,
+            Math.Max(0m, request.BulkDiscountAmount) + Math.Max(0m, request.ManualDiscountAmount));
+        var total = Math.Max(
+            0m,
+            lineSubtotal - totalDiscount + Math.Max(0m, request.ShippingCost) + Math.Max(0m, request.TaxAmount));
+
+        var snapshot = new
+        {
+            Project = new
+            {
+                project.Id,
+                project.ProjectNumber,
+                project.Title,
+                project.Description,
+                project.Status,
+                project.SourceProjectId,
+                project.SourceProjectNumber,
+                QuotationId = project.QuotationId,
+                CurrentQuotationVersionId = project.CurrentQuotationVersionId,
+                CurrentQuotationVersionNumber = project.CurrentQuotationVersionNumber
+            },
+            Customer = new
+            {
+                project.CustomerId,
+                project.CustomerName
+            },
+            Commercial = new
+            {
+                quotationRequest.ValidityPeriodStart,
+                quotationRequest.ValidityPeriodEnd,
+                quotationRequest.DeliveryExpectations,
+                quotationRequest.BulkDiscountAmount,
+                quotationRequest.ManualDiscountAmount,
+                quotationRequest.ShippingCost,
+                quotationRequest.TaxAmount,
+                quotationRequest.QuotationTerms,
+                project.Currency,
+                LineSubtotal = lineSubtotal,
+                TotalDiscount = totalDiscount,
+                Total = total
+            },
+            Quote = new
+            {
+                GeneratedBy = principalId,
+                quotationRequest.ChangeSummary,
+                quotationRequest.IdempotencyKey,
+                GeneratedAt = DateTime.UtcNow
+            },
+            Parts = activeParts
+                .OrderBy(part => part.PartNumber)
+                .Select(part => new
+                {
+                    part.Id,
+                    part.PartNumber,
+                    part.FileName,
+                    part.FileId,
+                    part.FileReference,
+                    part.ThumbnailSmallGcsPath,
+                    part.ThumbnailLargeGcsPath,
+                    part.GlbStoragePath,
+                    part.OverlayPaths,
+                    ProcessType = part.ProcessType.ToString(),
+                    part.MaterialId,
+                    part.MaterialName,
+                    part.MaterialCode,
+                    part.Quantity,
+                    part.FinishType,
+                    part.Color,
+                    part.Tolerance,
+                    part.RoughnessCode,
+                    part.MarkingType,
+                    part.MarkingText,
+                    part.DfmAcknowledged,
+                    part.HasDfmWarnings,
+                    part.HasThreadedHoles,
+                    part.ThreadedHoleSpec,
+                    part.ThreadedHoleCount,
+                    part.HasInserts,
+                    part.InsertType,
+                    part.InsertCount,
+                    part.BagAndTag,
+                    part.InspectionLevel,
+                    part.Certificates,
+                    part.DrawingFiles,
+                    part.SupplementaryFiles,
+                    part.ProcessConfig,
+                    part.BodyCount,
+                    part.BodiesJson,
+                    part.SelectedBodyIndex,
+                    part.ThreadsInserts,
+                    part.CustomNotes,
+                    part.VolumeCm3,
+                    part.SupportVolumeCm3,
+                    part.SurfaceAreaCm2,
+                    part.BoundingBoxX,
+                    part.BoundingBoxY,
+                    part.BoundingBoxZ,
+                    part.IsManifold,
+                    part.AiSuggestedPrice,
+                    part.ConfirmedUnitPrice,
+                    part.PriceOverrideReason,
+                    part.PricingConfidence,
+                    part.PricingStrategy,
+                    Status = part.Status.ToString(),
+                    LineTotal = (part.ConfirmedUnitPrice ?? part.AiSuggestedPrice ?? 0m) * part.Quantity
+                })
+        };
+
+        var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
+
+        return (json, hash);
+    }
 
     private async Task<Project> GetProjectOrThrowAsync(
         Guid projectId,

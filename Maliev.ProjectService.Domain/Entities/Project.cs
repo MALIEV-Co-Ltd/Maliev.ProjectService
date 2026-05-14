@@ -35,6 +35,18 @@ public class Project
     /// <summary>Human-readable quotation number. Denormalized for display.</summary>
     public string? QuotationNumber { get; set; }
 
+    /// <summary>Reference to the current immutable quotation version in QuotationService.</summary>
+    public Guid? CurrentQuotationVersionId { get; set; }
+
+    /// <summary>Current immutable quotation version number in QuotationService.</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
+    /// <summary>Source project identifier when this project was duplicated for reorder or revision work.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project number when this project was duplicated for reorder or revision work.</summary>
+    public string? SourceProjectNumber { get; set; }
+
     /// <summary>Sum of all confirmed part prices. Recomputed when parts are confirmed.</summary>
     public decimal TotalEstimatedPrice { get; set; }
 

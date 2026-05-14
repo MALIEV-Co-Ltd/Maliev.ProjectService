@@ -446,7 +446,40 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal("QuotationGenerated", updatedProject.Status);
         Assert.NotNull(updatedProject.QuotationId);
         Assert.StartsWith("QUO-TEST-", updatedProject.QuotationNumber);
+        Assert.NotNull(updatedProject.CurrentQuotationVersionId);
+        Assert.Equal(1, updatedProject.CurrentQuotationVersionNumber);
         Assert.Equal(beforeQuoteProject.TotalEstimatedPrice - 5m, updatedProject.TotalEstimatedPrice);
+    }
+
+    [Fact]
+    public async Task GenerateQuotation_ExistingQuotation_ShouldCreateNextVersionOnSameQuotation()
+    {
+        // Arrange
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+
+        var firstResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest { ValidityDays = 30, ChangeSummary = "Initial version" });
+        firstResponse.EnsureSuccessStatusCode();
+        var firstProject = await firstResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(firstProject);
+
+        // Act
+        var secondResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest { ValidityDays = 30, ChangeSummary = "Regenerated after commercial review" });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var secondProject = await secondResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(secondProject);
+        Assert.Equal(firstProject.QuotationId, secondProject.QuotationId);
+        Assert.Equal(2, secondProject.CurrentQuotationVersionNumber);
+        Assert.NotEqual(firstProject.CurrentQuotationVersionId, secondProject.CurrentQuotationVersionId);
     }
 
     [Fact]

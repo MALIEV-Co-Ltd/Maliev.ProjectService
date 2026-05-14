@@ -67,6 +67,25 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("quotation_number")
             .HasMaxLength(50);
 
+        builder.Property(p => p.CurrentQuotationVersionId)
+            .HasColumnName("current_quotation_version_id");
+
+        builder.Property(p => p.CurrentQuotationVersionNumber)
+            .HasColumnName("current_quotation_version_number");
+
+        builder.Property(p => p.SourceProjectId)
+            .HasColumnName("source_project_id");
+
+        builder.Property(p => p.SourceProjectNumber)
+            .HasColumnName("source_project_number")
+            .HasMaxLength(30);
+
+        builder.HasIndex(p => p.SourceProjectId)
+            .HasDatabaseName("idx_projects_source_project_id");
+
+        builder.HasIndex(p => p.CurrentQuotationVersionId)
+            .HasDatabaseName("idx_projects_current_quotation_version_id");
+
         builder.Property(p => p.TotalEstimatedPrice)
             .HasColumnName("total_estimated_price")
             .HasPrecision(18, 4)
