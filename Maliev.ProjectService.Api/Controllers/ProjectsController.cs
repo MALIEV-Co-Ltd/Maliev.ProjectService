@@ -280,8 +280,21 @@ public class ProjectsController : ControllerBase
         if (scopeResult is not null) return scopeResult;
 
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
-        var project = await _projectService.GenerateQuotationAsync(id, request, principalId, ct);
-        return Ok(project);
+        try
+        {
+            var project = await _projectService.GenerateQuotationAsync(id, request, principalId, ct);
+            return Ok(project);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Project {ProjectId} quotation generation failed validation.", id);
+            return UnprocessableEntity(new { error = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Project {ProjectId} quotation generation failed while calling a downstream service.", id);
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
+        }
     }
 
     /// <summary>Marks the project quotation as sent to the customer.</summary>

@@ -62,7 +62,7 @@ public class QuotationServiceClient : IQuotationServiceClient
         };
 
         var response = await _httpClient.PostAsJsonAsync("/quotation/v1/quotations", payload, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureQuotationServiceSuccessAsync(response, "create quotation", ct);
 
         var result = await response.Content.ReadFromJsonAsync<QuotationServiceCreateResponse>(ct);
         if (result is null)
@@ -123,7 +123,7 @@ public class QuotationServiceClient : IQuotationServiceClient
         };
 
         var response = await _httpClient.PutAsJsonAsync($"/quotation/v1/quotations/{quotationId}", payload, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureQuotationServiceSuccessAsync(response, "update quotation", ct);
 
         var result = await response.Content.ReadFromJsonAsync<QuotationServiceCreateResponse>(ct);
         if (result is null)
@@ -150,6 +150,22 @@ public class QuotationServiceClient : IQuotationServiceClient
 
     private static string CreateQuotationNumber(Guid id) =>
         $"Q-{id.ToString("N")[..8].ToUpperInvariant()}";
+
+    private static async Task EnsureQuotationServiceSuccessAsync(
+        HttpResponseMessage response,
+        string operation,
+        CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        var message = string.IsNullOrWhiteSpace(responseBody)
+            ? $"QuotationService failed to {operation} with HTTP {(int)response.StatusCode} {response.StatusCode}."
+            : $"QuotationService failed to {operation} with HTTP {(int)response.StatusCode} {response.StatusCode}: {responseBody}";
+
+        throw new HttpRequestException(message, null, response.StatusCode);
+    }
 
     private sealed class QuotationServiceCreateResponse
     {
