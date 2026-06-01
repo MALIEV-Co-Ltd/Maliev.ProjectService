@@ -490,6 +490,43 @@ public class ProjectSummaryResponse
 
     /// <summary>Created by employee name.</summary>
     public string CreatedByName { get; set; } = string.Empty;
+
+    /// <summary>Small preview records for the first active parts in this project.</summary>
+    public List<ProjectPartPreviewResponse> PartPreviews { get; set; } = [];
+}
+
+/// <summary>Compact project part preview for project list views.</summary>
+public class ProjectPartPreviewResponse
+{
+    /// <summary>Part unique identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Sequential part number within the project.</summary>
+    public int PartNumber { get; set; }
+
+    /// <summary>Original file name.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>GCS file reference path.</summary>
+    public string? FileReference { get; set; }
+
+    /// <summary>Thumbnail URL for display.</summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>Raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Manufacturing process name.</summary>
+    public string ProcessType { get; set; } = string.Empty;
+
+    /// <summary>Material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Ordered quantity.</summary>
+    public int Quantity { get; set; }
 }
 
 /// <summary>Detailed DTO for project detail view, including all parts and notes.</summary>

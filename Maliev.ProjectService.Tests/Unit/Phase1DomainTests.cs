@@ -260,6 +260,68 @@ public class Phase1DomainTests
         Assert.Equal(2, dto.ConfirmedPartsCount); // Confirmed + Ordered
     }
 
+    [Fact]
+    public void ToSummaryResponse_PartPreviews_ReturnsActivePartThumbnailsInPartOrder()
+    {
+        var firstPartId = Guid.NewGuid();
+        var secondPartId = Guid.NewGuid();
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            Parts =
+            [
+                new ProjectPart
+                {
+                    Id = secondPartId,
+                    PartNumber = 2,
+                    FileName = "bracket.stl",
+                    FileReference = "customers/c1/projects/p1/source/bracket.stl",
+                    ThumbnailUrl = "https://signed.example/bracket.webp",
+                    ThumbnailSmallGcsPath = "customers/c1/projects/p1/source/bracket_small.webp",
+                    ThumbnailLargeGcsPath = "customers/c1/projects/p1/source/bracket_large.webp",
+                    ProcessType = ManufacturingProcess.FDM,
+                    MaterialName = "PLA",
+                    Quantity = 3,
+                    Status = PartStatus.Uploaded
+                },
+                new ProjectPart
+                {
+                    Id = firstPartId,
+                    PartNumber = 1,
+                    FileName = "fixture.step",
+                    FileReference = "customers/c1/projects/p1/source/fixture.step",
+                    ThumbnailSmallGcsPath = "customers/c1/projects/p1/source/fixture_small.webp",
+                    ProcessType = ManufacturingProcess.CNC_Milling,
+                    MaterialName = "Aluminium 6061",
+                    Quantity = 1,
+                    Status = PartStatus.Confirmed
+                },
+                new ProjectPart
+                {
+                    Id = Guid.NewGuid(),
+                    PartNumber = 3,
+                    FileName = "removed.stl",
+                    ThumbnailUrl = "https://signed.example/removed.webp",
+                    Status = PartStatus.Removed
+                }
+            ],
+            Notes = []
+        };
+
+        var dto = project.ToSummaryResponse();
+
+        Assert.Equal(2, dto.PartPreviews.Count);
+        Assert.Equal(firstPartId, dto.PartPreviews[0].Id);
+        Assert.Equal("fixture.step", dto.PartPreviews[0].FileName);
+        Assert.Equal("customers/c1/projects/p1/source/fixture_small.webp", dto.PartPreviews[0].ThumbnailSmallGcsPath);
+        Assert.Equal("CNC_Milling", dto.PartPreviews[0].ProcessType);
+        Assert.Equal("Aluminium 6061", dto.PartPreviews[0].MaterialName);
+        Assert.Equal(1, dto.PartPreviews[0].Quantity);
+        Assert.Equal(secondPartId, dto.PartPreviews[1].Id);
+        Assert.Equal("https://signed.example/bracket.webp", dto.PartPreviews[1].ThumbnailUrl);
+        Assert.DoesNotContain(dto.PartPreviews, preview => preview.FileName == "removed.stl");
+    }
+
     // ── MappingExtensions: ProjectPart → PartResponse ─────────────────────
 
     [Fact]

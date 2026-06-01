@@ -69,7 +69,29 @@ public static class MappingExtensions
             SourceProjectId = project.SourceProjectId,
             SourceProjectNumber = project.SourceProjectNumber,
             CreatedAt = project.CreatedAt,
-            CreatedByName = project.CreatedByName
+            CreatedByName = project.CreatedByName,
+            PartPreviews = activeParts
+                .OrderBy(part => part.PartNumber)
+                .Take(4)
+                .Select(ToPreviewResponse)
+                .ToList()
+        };
+    }
+
+    private static ProjectPartPreviewResponse ToPreviewResponse(ProjectPart part)
+    {
+        return new ProjectPartPreviewResponse
+        {
+            Id = part.Id,
+            PartNumber = part.PartNumber,
+            FileName = part.FileName,
+            FileReference = part.FileReference,
+            ThumbnailUrl = part.ThumbnailUrl,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            ProcessType = part.ProcessType.ToString(),
+            MaterialName = part.MaterialName,
+            Quantity = part.Quantity
         };
     }
 
