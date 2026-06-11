@@ -100,6 +100,7 @@ public class Phase1MessagingTests : IAsyncLifetime
             Payload: new PaymentCompletedEventPayload(
                 OrderId:     orderId,
                 OrderNumber: "ORD-001",
+                CustomerId:  Guid.NewGuid().ToString(),
                 PaymentId:   paymentId,
                 Amount:      5000.0,
                 Currency:    "THB"
