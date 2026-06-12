@@ -50,8 +50,8 @@ public class JobStatusChangedEventConsumer : IConsumer<JobStatusChangedEvent>
         var newPartStatus = payload.NewStatus switch
         {
             "InProgress" or "Printing" or "Machining" or "Processing" => PartStatus.InProduction,
-            "QualityCheck" or "Inspection" => PartStatus.QualityCheck,
-            "Approved" or "Complete" or "Completed" => PartStatus.Approved,
+            "QualityCheck" or "Inspection" or "Completed" => PartStatus.QualityCheck,
+            "Approved" or "Complete" => PartStatus.Approved,
             _ => part.Status // keep existing status for unknown transitions
         };
 
