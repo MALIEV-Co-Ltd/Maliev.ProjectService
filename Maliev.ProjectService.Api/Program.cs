@@ -4,6 +4,7 @@ using Maliev.ProjectService.Infrastructure.Consumers;
 using Maliev.ProjectService.Infrastructure.Persistence;
 using Maliev.ProjectService.Infrastructure.Services;
 using Maliev.Aspire.ServiceDefaults;
+using MassTransit;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -32,6 +33,12 @@ try
     builder.AddStandardCache("project:");
     builder.AddMassTransitWithRabbitMq(x =>
     {
+        x.AddEntityFrameworkOutbox<ProjectDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
+
         x.AddConsumer<QuotationAcceptedEventConsumer>();
         x.AddConsumer<OrderCreatedEventConsumer>();
         x.AddConsumer<JobStatusChangedEventConsumer>();
