@@ -37,7 +37,14 @@ public class SearchReindexRequestedConsumer : IConsumer<SearchReindexRequestedCo
     /// <inheritdoc/>
     public async Task Consume(ConsumeContext<SearchReindexRequestedCommand> context)
     {
-        if (!ShouldHandle(context.Message.Payload.SourceService))
+        var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring SearchReindexRequestedCommand without payload");
+            return;
+        }
+
+        if (!ShouldHandle(payload.SourceService))
         {
             return;
         }

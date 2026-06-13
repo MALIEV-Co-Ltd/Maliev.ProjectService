@@ -117,6 +117,7 @@ public sealed class JobStatusChangedEventConsumerTests : IAsyncLifetime
             Payload: new JobStatusChangedEventPayload(
                 JobId: jobId,
                 OrderId: orderId,
+                OrderNumber: $"ORD-{orderId:N}",
                 PreviousStatus: previousStatus,
                 NewStatus: newStatus,
                 Technology: "FDM",

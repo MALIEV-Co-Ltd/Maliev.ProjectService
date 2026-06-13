@@ -34,6 +34,12 @@ public class JobStatusChangedEventConsumer : IConsumer<JobStatusChangedEvent>
     public async Task Consume(ConsumeContext<JobStatusChangedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring JobStatusChangedEvent without payload");
+            return;
+        }
+
         _logger.LogDebug("Received JobStatusChanged: Job {JobId} -> {NewStatus}", payload.JobId, payload.NewStatus);
 
         // Find the part linked to this job

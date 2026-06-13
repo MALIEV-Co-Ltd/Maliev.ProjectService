@@ -39,6 +39,12 @@ public class PaymentCompletedEventConsumer : IConsumer<PaymentCompletedEvent>
     public async Task Consume(ConsumeContext<PaymentCompletedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring PaymentCompletedEvent without payload");
+            return;
+        }
+
         var ct = context.CancellationToken;
 
         // Find a project that has a part linked to this order and is not yet paid/complete/cancelled

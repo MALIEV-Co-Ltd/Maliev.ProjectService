@@ -33,6 +33,12 @@ public class OrderCreatedEventConsumer : IConsumer<OrderCreatedEvent>
     public async Task Consume(ConsumeContext<OrderCreatedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring OrderCreatedEvent without payload");
+            return;
+        }
+
         _logger.LogInformation("Received OrderCreated for order {OrderId}", payload.OrderId);
 
         // Find project parts that are in Ordered/QuotationAccepted status and

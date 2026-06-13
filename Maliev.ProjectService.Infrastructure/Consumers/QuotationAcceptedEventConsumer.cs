@@ -35,6 +35,12 @@ public class QuotationAcceptedEventConsumer : IConsumer<QuotationAcceptedEvent>
     public async Task Consume(ConsumeContext<QuotationAcceptedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring QuotationAcceptedEvent without payload");
+            return;
+        }
+
         _logger.LogInformation("Received QuotationAccepted for quotation {QuotationId}", payload.QuotationId);
 
         // Find the project that owns this quotation

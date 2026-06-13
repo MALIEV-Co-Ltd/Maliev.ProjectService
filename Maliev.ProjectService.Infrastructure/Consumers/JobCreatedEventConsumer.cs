@@ -38,6 +38,12 @@ public class JobCreatedEventConsumer : IConsumer<JobCreatedEvent>
     public async Task Consume(ConsumeContext<JobCreatedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring JobCreatedEvent without payload");
+            return;
+        }
+
         var ct = context.CancellationToken;
 
         // Find the unlinked ProjectPart whose order + order-item IDs match
