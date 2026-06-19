@@ -42,8 +42,8 @@ try
         x.AddConsumer<QuotationAcceptedEventConsumer>();
         x.AddConsumer<OrderCreatedEventConsumer>();
         x.AddConsumer<JobStatusChangedEventConsumer>();
-        x.AddConsumer<JobCreatedEventConsumer>();
-        x.AddConsumer<PaymentCompletedEventConsumer>();
+        x.AddConsumer<ProjectJobCreatedEventConsumer>();
+        x.AddConsumer<ProjectPaymentCompletedEventConsumer>();
         x.AddConsumer<SearchReindexRequestedConsumer>();
     });
 
@@ -70,6 +70,9 @@ try
         sourceServiceName: "project");
     builder.AddAuthenticatedServiceClient<IQuotationServiceClient, QuotationServiceClient>(
         "QuotationService",
+        sourceServiceName: "project");
+    builder.AddAuthenticatedServiceClient<IJobServiceClient, JobServiceClient>(
+        "JobService",
         sourceServiceName: "project");
 
     builder.Services.AddPermissionAuthorization();

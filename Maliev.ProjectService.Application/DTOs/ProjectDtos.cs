@@ -819,6 +819,15 @@ public class ProjectNoteResponse
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>
+/// Request to link a production job to a project part.
+/// </summary>
+public class LinkProjectPartJobRequest
+{
+    /// <summary>Gets or sets the production job identifier.</summary>
+    public Guid JobId { get; set; }
+}
+
 /// <summary>Paginated project list response.</summary>
 public class PaginatedProjectResponse
 {

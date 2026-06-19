@@ -390,6 +390,27 @@ public class ProjectsController : ControllerBase
         return Ok(project);
     }
 
+    /// <summary>
+    /// Links a production job to a project part after JobService creates the job.
+    /// </summary>
+    [HttpPost("parts/{partId:guid}/job-link")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> LinkPartJob(
+        Guid partId,
+        [FromBody] LinkProjectPartJobRequest request,
+        CancellationToken ct = default)
+    {
+        if (request.JobId == Guid.Empty)
+        {
+            return BadRequest("jobId is required.");
+        }
+
+        await _projectService.LinkJobAsync(partId, request.JobId, ct);
+        return NoContent();
+    }
+
     // ─── Notes ───────────────────────────────────────────────────────────────────
 
     /// <summary>Adds an internal employee note to a project.</summary>

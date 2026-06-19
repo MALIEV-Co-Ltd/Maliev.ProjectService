@@ -17,21 +17,38 @@ namespace Maliev.ProjectService.Infrastructure.Consumers;
 /// with no job reference.
 /// </para>
 /// </summary>
-public class JobCreatedEventConsumer : IConsumer<JobCreatedEvent>
+public class ProjectJobCreatedEventConsumer : IConsumer<JobCreatedEvent>
 {
+    private static readonly TimeSpan DefaultRetryInterval = TimeSpan.FromMilliseconds(250);
+    private const int DefaultRetryAttempts = 240;
+
     private readonly ProjectDbContext _db;
     private readonly IProjectService _projectService;
-    private readonly ILogger<JobCreatedEventConsumer> _logger;
+    private readonly ILogger<ProjectJobCreatedEventConsumer> _logger;
+    private readonly int _retryAttempts;
+    private readonly TimeSpan _retryInterval;
 
-    /// <summary>Initializes a new instance of <see cref="JobCreatedEventConsumer"/>.</summary>
-    public JobCreatedEventConsumer(
+    /// <summary>Initializes a new instance of <see cref="ProjectJobCreatedEventConsumer"/>.</summary>
+    public ProjectJobCreatedEventConsumer(
         ProjectDbContext db,
         IProjectService projectService,
-        ILogger<JobCreatedEventConsumer> logger)
+        ILogger<ProjectJobCreatedEventConsumer> logger)
+        : this(db, projectService, logger, DefaultRetryAttempts, DefaultRetryInterval)
+    {
+    }
+
+    internal ProjectJobCreatedEventConsumer(
+        ProjectDbContext db,
+        IProjectService projectService,
+        ILogger<ProjectJobCreatedEventConsumer> logger,
+        int retryAttempts,
+        TimeSpan retryInterval)
     {
         _db = db;
         _projectService = projectService;
         _logger = logger;
+        _retryAttempts = Math.Max(0, retryAttempts);
+        _retryInterval = retryInterval;
     }
 
     /// <inheritdoc />
@@ -46,12 +63,7 @@ public class JobCreatedEventConsumer : IConsumer<JobCreatedEvent>
 
         var ct = context.CancellationToken;
 
-        // Find the unlinked ProjectPart whose order + order-item IDs match
-        var part = await _db.ProjectParts
-            .FirstOrDefaultAsync(p =>
-                p.OrderId == payload.OrderId &&
-                p.OrderItemId == payload.OrderItemId &&
-                p.JobId == null, ct);
+        var part = await FindLinkedPartAsync(payload, ct);
 
         if (part is null)
         {
@@ -67,5 +79,26 @@ public class JobCreatedEventConsumer : IConsumer<JobCreatedEvent>
             payload.JobId, payload.JobNumber, part.Id, part.ProjectId);
 
         await _projectService.LinkJobAsync(part.Id, payload.JobId, ct);
+    }
+
+    private async Task<Domain.Entities.ProjectPart?> FindLinkedPartAsync(JobCreatedEventPayload payload, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt <= _retryAttempts; attempt++)
+        {
+            var part = await _db.ProjectParts
+                .FirstOrDefaultAsync(p =>
+                    p.OrderId == payload.OrderId &&
+                    p.OrderItemId == payload.OrderItemId &&
+                    p.JobId == null, ct);
+
+            if (part is not null || attempt == _retryAttempts)
+            {
+                return part;
+            }
+
+            await Task.Delay(_retryInterval, ct);
+        }
+
+        return null;
     }
 }

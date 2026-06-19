@@ -35,12 +35,12 @@ public sealed class ProjectConsumerNullPayloadTests
     }
 
     [Fact]
-    public async Task JobCreatedEventConsumer_WithoutPayload_IsIgnored()
+    public async Task ProjectJobCreatedEventConsumer_WithoutPayload_IsIgnored()
     {
-        var consumer = new JobCreatedEventConsumer(
+        var consumer = new ProjectJobCreatedEventConsumer(
             null!,
             _projectService.Object,
-            Mock.Of<ILogger<JobCreatedEventConsumer>>());
+            Mock.Of<ILogger<ProjectJobCreatedEventConsumer>>());
 
         await consumer.Consume(CreateContext(new JobCreatedEvent { Payload = null! }).Object);
 
@@ -71,12 +71,13 @@ public sealed class ProjectConsumerNullPayloadTests
     }
 
     [Fact]
-    public async Task PaymentCompletedEventConsumer_WithoutPayload_IsIgnored()
+    public async Task ProjectPaymentCompletedEventConsumer_WithoutPayload_IsIgnored()
     {
-        var consumer = new PaymentCompletedEventConsumer(
+        var consumer = new ProjectPaymentCompletedEventConsumer(
             null!,
             _projectService.Object,
-            Mock.Of<ILogger<PaymentCompletedEventConsumer>>());
+            Mock.Of<IJobServiceClient>(),
+            Mock.Of<ILogger<ProjectPaymentCompletedEventConsumer>>());
 
         await consumer.Consume(CreateContext(new PaymentCompletedEvent { Payload = null! }).Object);
 
