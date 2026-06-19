@@ -820,6 +820,15 @@ public class ProjectNoteResponse
 }
 
 /// <summary>
+/// Customer request to route a project back to an employee review queue.
+/// </summary>
+public class RequestProjectReviewRequest
+{
+    /// <summary>Customer-visible reason or question that needs employee review.</summary>
+    public string Note { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Request to link a production job to a project part.
 /// </summary>
 public class LinkProjectPartJobRequest

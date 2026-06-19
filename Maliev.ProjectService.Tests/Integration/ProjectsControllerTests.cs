@@ -514,6 +514,34 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task RequestReview_DraftProject_ShouldSetCustomerReviewStatusAndAddNote()
+    {
+        var project = await CreateTestProjectAsync();
+        var request = new RequestProjectReviewRequest
+        {
+            Note = "Please review the thin wall before quoting."
+        };
+
+        var response = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/request-review",
+            request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var reviewedProject = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(reviewedProject);
+        Assert.Equal("CustomerReview", reviewedProject.Status);
+        Assert.Contains(reviewedProject.Notes, note =>
+            note.Content.Contains("Customer requested employee review from Make Studio", StringComparison.Ordinal) &&
+            note.Content.Contains(request.Note, StringComparison.Ordinal));
+
+        var queueResponse = await Client.GetAsync("/project/v1/projects?status=CustomerReview");
+        queueResponse.EnsureSuccessStatusCode();
+        var queue = await queueResponse.Content.ReadFromJsonAsync<PaginatedProjectResponse>();
+        Assert.NotNull(queue);
+        Assert.Contains(queue.Data, item => item.Id == project.Id && item.Status == "CustomerReview");
+    }
+
+    [Fact]
     public async Task Delete_DraftProject_ShouldReturnNoContent()
     {
         var project = await CreateTestProjectAsync();

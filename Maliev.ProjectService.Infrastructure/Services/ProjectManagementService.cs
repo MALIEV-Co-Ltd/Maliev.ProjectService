@@ -748,6 +748,46 @@ public class ProjectManagementService : IProjectService
     }
 
     /// <inheritdoc />
+    public async Task<ProjectDetailResponse> RequestCustomerReviewAsync(
+        Guid projectId,
+        RequestProjectReviewRequest request,
+        string principalId,
+        string principalName,
+        CancellationToken ct = default)
+    {
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
+        if (project.Status >= ProjectStatus.QuotationAccepted)
+        {
+            throw new InvalidOperationException($"Project {project.ProjectNumber} cannot request customer review in {project.Status} status.");
+        }
+
+        var note = new ProjectNote
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            AuthorId = principalId,
+            AuthorName = string.IsNullOrWhiteSpace(principalName) ? "Customer" : principalName,
+            Content = string.IsNullOrWhiteSpace(request.Note)
+                ? "Customer requested employee review from Make Studio."
+                : $"Customer requested employee review from Make Studio: {request.Note.Trim()}",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        project.Status = ProjectStatus.CustomerReview;
+        project.UpdatedAt = DateTime.UtcNow;
+        _db.ProjectNotes.Add(note);
+
+        await _db.SaveChangesAsync(ct);
+        await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
+        _logger.LogInformation("Customer review requested for project {ProjectNumber} by {PrincipalId}",
+            project.ProjectNumber, principalId);
+
+        return project.ToDetailResponse();
+    }
+
+    /// <inheritdoc />
     public async Task UpdateStatusAsync(Guid projectId, string newStatus, CancellationToken ct = default)
     {
         var project = await _db.Projects.FindAsync([projectId], ct);
@@ -864,7 +904,9 @@ public class ProjectManagementService : IProjectService
         var activeCount = await _db.Projects.CountAsync(
             p => p.Status != ProjectStatus.Completed && p.Status != ProjectStatus.Cancelled, ct);
         var configuringCount = await _db.Projects.CountAsync(
-            p => p.Status == ProjectStatus.Draft || p.Status == ProjectStatus.Configuring, ct);
+            p => p.Status == ProjectStatus.Draft ||
+                p.Status == ProjectStatus.Configuring ||
+                p.Status == ProjectStatus.CustomerReview, ct);
         var quotedCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.QuotationGenerated || p.Status == ProjectStatus.QuotationSent, ct);
         var inProductionCount = await _db.Projects.CountAsync(

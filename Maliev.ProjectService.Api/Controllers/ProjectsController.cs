@@ -390,6 +390,33 @@ public class ProjectsController : ControllerBase
         return Ok(project);
     }
 
+    /// <summary>Routes a customer project to employee review and records the customer's note.</summary>
+    [HttpPost("{id:guid}/request-review")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ProjectDetailResponse>> RequestReview(
+        Guid id,
+        [FromBody] RequestProjectReviewRequest request,
+        CancellationToken ct = default)
+    {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
+        var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var principalName = User.FindFirst("name")?.Value ?? "Customer";
+        try
+        {
+            var project = await _projectService.RequestCustomerReviewAsync(id, request, principalId, principalName, ct);
+            return Ok(project);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
     /// <summary>
     /// Links a production job to a project part after JobService creates the job.
     /// </summary>

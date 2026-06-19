@@ -52,6 +52,9 @@ public interface IProjectService
     /// <summary>Manually marks quotation as accepted (for employee-assisted acceptance). Triggers order creation event.</summary>
     Task<ProjectDetailResponse> AcceptQuotationAsync(Guid projectId, string principalId, CancellationToken ct = default);
 
+    /// <summary>Routes a customer project to employee review and records the customer's note.</summary>
+    Task<ProjectDetailResponse> RequestCustomerReviewAsync(Guid projectId, RequestProjectReviewRequest request, string principalId, string principalName, CancellationToken ct = default);
+
     /// <summary>Updates project status (used by event consumers).</summary>
     Task UpdateStatusAsync(Guid projectId, string newStatus, CancellationToken ct = default);
 

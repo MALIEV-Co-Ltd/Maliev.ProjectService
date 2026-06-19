@@ -11,39 +11,42 @@ public enum ProjectStatus
     /// <summary>Parts are being configured, priced, and confirmed by the employee.</summary>
     Configuring = 2,
 
+    /// <summary>Customer has requested employee review before quotation proceeds.</summary>
+    CustomerReview = 3,
+
     /// <summary>A formal quotation has been generated from confirmed parts.</summary>
-    QuotationGenerated = 3,
+    QuotationGenerated = 4,
 
     /// <summary>The quotation has been sent to the customer for review.</summary>
-    QuotationSent = 4,
+    QuotationSent = 5,
 
     /// <summary>Customer has accepted the quotation. Orders will be/have been created.</summary>
-    QuotationAccepted = 5,
+    QuotationAccepted = 6,
 
     /// <summary>Production jobs are in progress for one or more parts.</summary>
-    InProduction = 6,
+    InProduction = 7,
 
     /// <summary>All jobs are complete and awaiting quality check approval.</summary>
-    QualityCheck = 7,
+    QualityCheck = 8,
 
     /// <summary>All parts have passed QC and are ready for shipment.</summary>
-    ReadyToShip = 8,
+    ReadyToShip = 9,
 
     /// <summary>Order has been shipped to the customer.</summary>
-    Shipped = 9,
+    Shipped = 10,
 
     /// <summary>Customer has confirmed receipt of the delivery.</summary>
-    Delivered = 10,
+    Delivered = 11,
 
     /// <summary>Invoice has been issued for the completed order.</summary>
-    Invoiced = 11,
+    Invoiced = 12,
 
     /// <summary>Payment has been received. Project lifecycle is complete.</summary>
-    Paid = 12,
+    Paid = 13,
 
     /// <summary>All financial and delivery aspects are complete.</summary>
-    Completed = 13,
+    Completed = 14,
 
     /// <summary>Project was cancelled before completion.</summary>
-    Cancelled = 14
+    Cancelled = 15
 }
