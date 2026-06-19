@@ -29,6 +29,12 @@ public class Project
     /// <summary>Current lifecycle status of the project.</summary>
     public ProjectStatus Status { get; set; } = ProjectStatus.Draft;
 
+    /// <summary>Whether the customer has pinned this project for quick access.</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>Whether the customer has archived this project from active Make Studio views.</summary>
+    public bool IsArchived { get; set; }
+
     /// <summary>Reference to the generated quotation in QuotationService. Null until generated.</summary>
     public Guid? QuotationId { get; set; }
 

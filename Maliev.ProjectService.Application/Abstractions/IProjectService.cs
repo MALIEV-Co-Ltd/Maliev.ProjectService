@@ -19,6 +19,12 @@ public interface IProjectService
     /// <summary>Updates project metadata (title, description).</summary>
     Task<ProjectDetailResponse> UpdateAsync(Guid projectId, UpdateProjectRequest request, string principalId, CancellationToken ct = default);
 
+    /// <summary>Sets whether a project is pinned for quick customer access.</summary>
+    Task<ProjectDetailResponse> SetPinnedAsync(Guid projectId, bool isPinned, string principalId, CancellationToken ct = default);
+
+    /// <summary>Sets whether a project is archived from active customer views.</summary>
+    Task<ProjectDetailResponse> SetArchivedAsync(Guid projectId, bool isArchived, string principalId, CancellationToken ct = default);
+
     /// <summary>Soft-deletes a project. Only Draft projects may be deleted.</summary>
     Task DeleteAsync(Guid projectId, string principalId, CancellationToken ct = default);
 

@@ -458,6 +458,12 @@ public class ProjectSummaryResponse
     /// <summary>Current project status.</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>Whether the project is pinned by the customer for quick access.</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>Whether the project is archived from active customer views.</summary>
+    public bool IsArchived { get; set; }
+
     /// <summary>Number of parts in this project.</summary>
     public int PartsCount { get; set; }
 
@@ -552,6 +558,12 @@ public class ProjectDetailResponse
 
     /// <summary>Current project status.</summary>
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>Whether the project is pinned by the customer for quick access.</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>Whether the project is archived from active customer views.</summary>
+    public bool IsArchived { get; set; }
 
     /// <summary>Quotation ID (if generated).</summary>
     public Guid? QuotationId { get; set; }

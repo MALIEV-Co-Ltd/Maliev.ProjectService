@@ -144,6 +144,60 @@ public class ProjectsController : ControllerBase
         return Ok(project);
     }
 
+    /// <summary>Pins a project for quick customer access.</summary>
+    [HttpPost("{id:guid}/pin")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProjectDetailResponse>> Pin(Guid id, CancellationToken ct = default)
+    {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
+        var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? "unknown";
+
+        var project = await _projectService.SetPinnedAsync(id, isPinned: true, principalId, ct);
+        return Ok(project);
+    }
+
+    /// <summary>Removes a project from pinned quick access.</summary>
+    [HttpDelete("{id:guid}/pin")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProjectDetailResponse>> Unpin(Guid id, CancellationToken ct = default)
+    {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
+        var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? "unknown";
+
+        var project = await _projectService.SetPinnedAsync(id, isPinned: false, principalId, ct);
+        return Ok(project);
+    }
+
+    /// <summary>Archives a project from active customer views.</summary>
+    [HttpPost("{id:guid}/archive")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProjectDetailResponse>> Archive(Guid id, CancellationToken ct = default)
+    {
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
+        var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? "unknown";
+
+        var project = await _projectService.SetArchivedAsync(id, isArchived: true, principalId, ct);
+        return Ok(project);
+    }
+
     /// <summary>Soft-deletes a project. Only Draft status projects may be deleted.</summary>
     [HttpDelete("{id:guid}")]
     [RequirePermission(ProjectPermissions.Projects.Delete)]

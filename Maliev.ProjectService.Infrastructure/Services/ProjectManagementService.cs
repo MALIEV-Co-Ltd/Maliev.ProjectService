@@ -202,6 +202,44 @@ public class ProjectManagementService : IProjectService
     }
 
     /// <inheritdoc />
+    public async Task<ProjectDetailResponse> SetPinnedAsync(
+        Guid projectId,
+        bool isPinned,
+        string principalId,
+        CancellationToken ct = default)
+    {
+        var project = await GetProjectOrThrowAsync(projectId, ct);
+
+        project.IsPinned = isPinned;
+        project.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
+        return project.ToDetailResponse();
+    }
+
+    /// <inheritdoc />
+    public async Task<ProjectDetailResponse> SetArchivedAsync(
+        Guid projectId,
+        bool isArchived,
+        string principalId,
+        CancellationToken ct = default)
+    {
+        var project = await GetProjectOrThrowAsync(projectId, ct);
+
+        project.IsArchived = isArchived;
+        project.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
+        return project.ToDetailResponse();
+    }
+
+    /// <inheritdoc />
     public async Task DeleteAsync(Guid projectId, string principalId, CancellationToken ct = default)
     {
         var project = await GetProjectOrThrowAsync(projectId, ct);

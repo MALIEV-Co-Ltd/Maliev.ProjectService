@@ -192,6 +192,37 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task PinAndArchive_Project_ShouldPersistCustomerFlags()
+    {
+        var project = await CreateTestProjectAsync();
+
+        var pinResponse = await Client.PostAsync($"/project/v1/projects/{project.Id}/pin", null);
+        pinResponse.EnsureSuccessStatusCode();
+        var pinned = await pinResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+
+        Assert.NotNull(pinned);
+        Assert.True(pinned.IsPinned);
+        Assert.False(pinned.IsArchived);
+
+        var archiveResponse = await Client.PostAsync($"/project/v1/projects/{project.Id}/archive", null);
+        archiveResponse.EnsureSuccessStatusCode();
+        var archived = await archiveResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+
+        Assert.NotNull(archived);
+        Assert.True(archived.IsPinned);
+        Assert.True(archived.IsArchived);
+
+        var listResponse = await Client.GetAsync($"/project/v1/projects?customerId={project.CustomerId:D}");
+        listResponse.EnsureSuccessStatusCode();
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedProjectResponse>();
+
+        Assert.NotNull(list);
+        var listed = Assert.Single(list.Data, item => item.Id == project.Id);
+        Assert.True(listed.IsPinned);
+        Assert.True(listed.IsArchived);
+    }
+
+    [Fact]
     public async Task GetAll_WithPartFileQuery_ReturnsProjectContainingPart()
     {
         var project = await CreateTestProjectAsync();

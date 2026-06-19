@@ -60,6 +60,19 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasIndex(p => new { p.Status, p.UpdatedAt })
             .HasDatabaseName("idx_projects_status_updated_at");
 
+        builder.Property(p => p.IsPinned)
+            .HasColumnName("is_pinned")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(p => p.IsArchived)
+            .HasColumnName("is_archived")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.HasIndex(p => new { p.CustomerId, p.IsArchived, p.IsPinned, p.UpdatedAt })
+            .HasDatabaseName("idx_projects_customer_archive_pin_updated");
+
         builder.Property(p => p.QuotationId)
             .HasColumnName("quotation_id");
 
