@@ -4,6 +4,7 @@ using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.MessagingContracts.Contracts.Quotations;
 using Maliev.MessagingContracts.Contracts.Search;
 using Maliev.ProjectService.Application.Abstractions;
+using Maliev.ProjectService.Application.DTOs;
 using Maliev.ProjectService.Infrastructure.Consumers;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -102,6 +103,7 @@ public sealed class ProjectConsumerNullPayloadTests
         _projectService.Verify(
             service => service.AcceptQuotationAsync(
                 It.IsAny<Guid>(),
+                It.IsAny<AcceptQuotationRequest>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);

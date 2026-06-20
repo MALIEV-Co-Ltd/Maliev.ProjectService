@@ -4,6 +4,7 @@ using Maliev.ProjectService.Application.DTOs;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Aspire.ServiceDefaults.IAM;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Asp.Versioning;
 using System.Security.Claims;
 
@@ -373,6 +374,10 @@ public class ProjectsController : ControllerBase
     /// Manually marks a quotation as accepted (used when customer calls or emails acceptance).
     /// Triggers order creation via event publishing.
     /// </summary>
+    /// <param name="id">The project identifier.</param>
+    /// <param name="request">Optional expected quotation version for stale-acceptance protection.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated project detail.</returns>
     [HttpPost("{id:guid}/accept-quotation")]
     [RequirePermission(ProjectPermissions.Projects.Accept)]
     [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
@@ -380,14 +385,23 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ProjectDetailResponse>> AcceptQuotation(
         Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AcceptQuotationRequest? request,
         CancellationToken ct = default)
     {
         var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
         if (scopeResult is not null) return scopeResult;
 
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
-        var project = await _projectService.AcceptQuotationAsync(id, principalId, ct);
-        return Ok(project);
+        try
+        {
+            var project = await _projectService.AcceptQuotationAsync(id, request ?? new AcceptQuotationRequest(), principalId, ct);
+            return Ok(project);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Project {ProjectId} quotation acceptance failed validation.", id);
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>Routes a customer project to employee review and records the customer's note.</summary>

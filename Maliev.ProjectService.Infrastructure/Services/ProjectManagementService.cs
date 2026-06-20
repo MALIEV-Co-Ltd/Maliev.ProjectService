@@ -687,6 +687,7 @@ public class ProjectManagementService : IProjectService
     /// <inheritdoc />
     public async Task<ProjectDetailResponse> AcceptQuotationAsync(
         Guid projectId,
+        AcceptQuotationRequest request,
         string principalId,
         CancellationToken ct = default)
     {
@@ -694,6 +695,18 @@ public class ProjectManagementService : IProjectService
 
         if (project.Status != ProjectStatus.QuotationSent && project.Status != ProjectStatus.QuotationGenerated)
             throw new InvalidOperationException($"Project must have a sent quotation to be accepted. Current: {project.Status}");
+
+        if (request.ExpectedQuotationVersionId is { } expectedVersionId &&
+            project.CurrentQuotationVersionId != expectedVersionId)
+        {
+            throw new InvalidOperationException("The requested quotation version is no longer current. Refresh the project before accepting.");
+        }
+
+        if (request.ExpectedQuotationVersionNumber is { } expectedVersionNumber &&
+            project.CurrentQuotationVersionNumber != expectedVersionNumber)
+        {
+            throw new InvalidOperationException("The requested quotation version is no longer current. Refresh the project before accepting.");
+        }
 
         project.Status = ProjectStatus.QuotationAccepted;
         project.UpdatedAt = DateTime.UtcNow;

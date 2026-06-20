@@ -829,6 +829,18 @@ public class RequestProjectReviewRequest
 }
 
 /// <summary>
+/// Request to accept the currently displayed quotation version for a project.
+/// </summary>
+public class AcceptQuotationRequest
+{
+    /// <summary>Expected current quotation version identifier.</summary>
+    public Guid? ExpectedQuotationVersionId { get; set; }
+
+    /// <summary>Expected current quotation version number.</summary>
+    public int? ExpectedQuotationVersionNumber { get; set; }
+}
+
+/// <summary>
 /// Request to link a production job to a project part.
 /// </summary>
 public class LinkProjectPartJobRequest

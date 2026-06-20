@@ -514,6 +514,49 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task AcceptQuotation_WithStaleExpectedVersion_ShouldReturnConflictAndLeaveProjectQuoted()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+
+        var firstResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest { ValidityDays = 30, ChangeSummary = "Initial version" });
+        firstResponse.EnsureSuccessStatusCode();
+        var firstProject = await firstResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(firstProject);
+        Assert.NotNull(firstProject.CurrentQuotationVersionId);
+
+        var secondResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest { ValidityDays = 30, ChangeSummary = "Regenerated after commercial review" });
+        secondResponse.EnsureSuccessStatusCode();
+        var secondProject = await secondResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(secondProject);
+        Assert.Equal(2, secondProject.CurrentQuotationVersionNumber);
+
+        var staleAcceptResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/accept-quotation",
+            new AcceptQuotationRequest
+            {
+                ExpectedQuotationVersionId = firstProject.CurrentQuotationVersionId,
+                ExpectedQuotationVersionNumber = firstProject.CurrentQuotationVersionNumber
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, staleAcceptResponse.StatusCode);
+        var afterConflictResponse = await Client.GetAsync($"/project/v1/projects/{project.Id}");
+        afterConflictResponse.EnsureSuccessStatusCode();
+        var afterConflictProject = await afterConflictResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(afterConflictProject);
+        Assert.Equal("QuotationGenerated", afterConflictProject.Status);
+        Assert.Equal(secondProject.CurrentQuotationVersionId, afterConflictProject.CurrentQuotationVersionId);
+        Assert.Equal(2, afterConflictProject.CurrentQuotationVersionNumber);
+    }
+
+    [Fact]
     public async Task RequestReview_DraftProject_ShouldSetCustomerReviewStatusAndAddNote()
     {
         var project = await CreateTestProjectAsync();
