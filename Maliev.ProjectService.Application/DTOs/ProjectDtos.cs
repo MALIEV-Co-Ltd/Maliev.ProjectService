@@ -877,6 +877,9 @@ public class ProjectStatsResponse
     /// <summary>Projects currently in Draft or Configuring status.</summary>
     public int ConfiguringCount { get; set; }
 
+    /// <summary>Projects waiting for employee review before pricing or quotation.</summary>
+    public int CustomerReviewCount { get; set; }
+
     /// <summary>Projects with sent/pending quotations.</summary>
     public int QuotedCount { get; set; }
 

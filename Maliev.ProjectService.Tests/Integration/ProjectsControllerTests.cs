@@ -609,6 +609,36 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.True(stats.ActiveCount >= 0);
     }
 
+    [Fact]
+    public async Task GetStats_AfterCustomerReviewRequest_ShouldCountReviewSeparatelyFromConfiguring()
+    {
+        var baselineResponse = await Client.GetAsync("/project/v1/projects/stats");
+        baselineResponse.EnsureSuccessStatusCode();
+        var baseline = await baselineResponse.Content.ReadFromJsonAsync<ProjectStatsResponse>();
+        Assert.NotNull(baseline);
+
+        var project = await CreateTestProjectAsync();
+
+        var draftStatsResponse = await Client.GetAsync("/project/v1/projects/stats");
+        draftStatsResponse.EnsureSuccessStatusCode();
+        var draftStats = await draftStatsResponse.Content.ReadFromJsonAsync<ProjectStatsResponse>();
+        Assert.NotNull(draftStats);
+        Assert.Equal(baseline.ConfiguringCount + 1, draftStats.ConfiguringCount);
+
+        var reviewResponse = await Client.PostAsJsonAsync($"/project/v1/projects/{project.Id}/request-review", new RequestProjectReviewRequest
+        {
+            Note = "Customer requested DFM review from Make Studio."
+        });
+        reviewResponse.EnsureSuccessStatusCode();
+
+        var reviewedStatsResponse = await Client.GetAsync("/project/v1/projects/stats");
+        reviewedStatsResponse.EnsureSuccessStatusCode();
+        var reviewedStats = await reviewedStatsResponse.Content.ReadFromJsonAsync<ProjectStatsResponse>();
+        Assert.NotNull(reviewedStats);
+        Assert.Equal(baseline.ConfiguringCount, reviewedStats.ConfiguringCount);
+        Assert.Equal(baseline.CustomerReviewCount + 1, reviewedStats.CustomerReviewCount);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<ProjectDetailResponse> CreateTestProjectAsync(Guid? customerId = null)

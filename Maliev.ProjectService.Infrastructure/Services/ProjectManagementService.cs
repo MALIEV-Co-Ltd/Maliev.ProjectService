@@ -918,8 +918,9 @@ public class ProjectManagementService : IProjectService
             p => p.Status != ProjectStatus.Completed && p.Status != ProjectStatus.Cancelled, ct);
         var configuringCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.Draft ||
-                p.Status == ProjectStatus.Configuring ||
-                p.Status == ProjectStatus.CustomerReview, ct);
+                p.Status == ProjectStatus.Configuring, ct);
+        var customerReviewCount = await _db.Projects.CountAsync(
+            p => p.Status == ProjectStatus.CustomerReview, ct);
         var quotedCount = await _db.Projects.CountAsync(
             p => p.Status == ProjectStatus.QuotationGenerated || p.Status == ProjectStatus.QuotationSent, ct);
         var inProductionCount = await _db.Projects.CountAsync(
@@ -931,6 +932,7 @@ public class ProjectManagementService : IProjectService
         {
             ActiveCount = activeCount,
             ConfiguringCount = configuringCount,
+            CustomerReviewCount = customerReviewCount,
             QuotedCount = quotedCount,
             InProductionCount = inProductionCount,
             CompletedThisMonth = completedThisMonthCount
