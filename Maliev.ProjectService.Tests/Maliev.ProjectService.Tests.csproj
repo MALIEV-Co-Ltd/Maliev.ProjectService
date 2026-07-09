@@ -4,6 +4,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Match the fleet: main projects enforce warnings-as-errors; the test project must too
+         so NuGetAudit advisories fail the build instead of scrolling past as warnings. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <SharedLibraryVersion Condition="'$(SharedLibraryVersion)' == ''">1.0.*-*</SharedLibraryVersion>
   </PropertyGroup>
 
