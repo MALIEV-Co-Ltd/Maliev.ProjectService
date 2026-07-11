@@ -286,17 +286,29 @@ public class UpdateProjectPartRequest
     [MaxLength(100)]
     public string? FinishType { get; set; }
 
+    /// <summary>Explicitly clears the current finish when true.</summary>
+    public bool ClearFinishType { get; set; }
+
     /// <summary>Colour.</summary>
     [MaxLength(200)]
     public string? Color { get; set; }
+
+    /// <summary>Explicitly clears the current colour when true.</summary>
+    public bool ClearColor { get; set; }
 
     /// <summary>Tolerance.</summary>
     [MaxLength(100)]
     public string? Tolerance { get; set; }
 
+    /// <summary>Explicitly clears the current tolerance when true.</summary>
+    public bool ClearTolerance { get; set; }
+
     /// <summary>CNC surface roughness code.</summary>
     [MaxLength(100)]
     public string? RoughnessCode { get; set; }
+
+    /// <summary>Explicitly clears the current roughness when true.</summary>
+    public bool ClearRoughnessCode { get; set; }
 
     /// <summary>Marking type selected for the part.</summary>
     [MaxLength(100)]
@@ -319,6 +331,9 @@ public class UpdateProjectPartRequest
     [MaxLength(200)]
     public string? ThreadedHoleSpec { get; set; }
 
+    /// <summary>Explicitly clears the current threaded-hole specification when true.</summary>
+    public bool ClearThreadedHoleSpec { get; set; }
+
     /// <summary>Threaded hole count.</summary>
     [Range(0, 10000)]
     public int? ThreadedHoleCount { get; set; }
@@ -330,6 +345,9 @@ public class UpdateProjectPartRequest
     [MaxLength(100)]
     public string? InsertType { get; set; }
 
+    /// <summary>Explicitly clears the current insert type when true.</summary>
+    public bool ClearInsertType { get; set; }
+
     /// <summary>Insert count.</summary>
     [Range(0, 10000)]
     public int? InsertCount { get; set; }
@@ -340,6 +358,9 @@ public class UpdateProjectPartRequest
     /// <summary>Inspection level selected for this part.</summary>
     [MaxLength(100)]
     public string? InspectionLevel { get; set; }
+
+    /// <summary>Explicitly clears the current inspection level when true.</summary>
+    public bool ClearInspectionLevel { get; set; }
 
     /// <summary>Requested certificates for this part.</summary>
     public List<string>? Certificates { get; set; }
@@ -384,6 +405,9 @@ public class UpdateProjectPartRequest
     /// <summary>Custom notes.</summary>
     [MaxLength(2000)]
     public string? CustomNotes { get; set; }
+
+    /// <summary>Explicitly clears the current customer-visible part notes when true.</summary>
+    public bool ClearCustomNotes { get; set; }
 }
 
 /// <summary>Request to confirm (or override) the AI suggested price for a part.</summary>

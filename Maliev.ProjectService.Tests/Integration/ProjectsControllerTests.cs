@@ -739,6 +739,79 @@ public class ProjectsControllerTests : BaseIntegrationTest
     }
 
     [Fact]
+    public async Task UpdatePart_ExplicitOptionalFieldClears_ShouldRoundTripAndInvalidatePricing()
+    {
+        var project = await CreateTestProjectAsync();
+        var addResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts",
+            new AddProjectPartRequest
+            {
+                FileName = "clearable-options.step",
+                ProcessType = Domain.Enums.ManufacturingProcess.CNC_Milling,
+                MaterialId = Guid.NewGuid(),
+                MaterialName = "Aluminium 6061",
+                MaterialCode = "AL6061",
+                Quantity = 2,
+                FinishType = "Anodized",
+                Color = "Black",
+                Tolerance = "ISO-2768-f",
+                RoughnessCode = "RA_1_6",
+                ThreadedHoleSpec = "M4",
+                ThreadedHoleCount = 4,
+                InsertType = "HELICOIL_M4",
+                InsertCount = 2,
+                InspectionLevel = "CMM",
+                CustomNotes = "Protect cosmetic face",
+                VolumeCm3 = 10m,
+                BoundingBoxX = 50m,
+                BoundingBoxY = 30m,
+                BoundingBoxZ = 20m,
+                IsManifold = true
+            });
+        addResponse.EnsureSuccessStatusCode();
+        var part = await addResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(part);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                ExpectedVersion = before.Version,
+                ClearFinishType = true,
+                ClearColor = true,
+                ClearTolerance = true,
+                ClearRoughnessCode = true,
+                ClearThreadedHoleSpec = true,
+                ClearInsertType = true,
+                ClearInspectionLevel = true,
+                ClearCustomNotes = true
+            });
+
+        updateResponse.EnsureSuccessStatusCode();
+        var updated = await updateResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(updated);
+        Assert.Null(updated.FinishType);
+        Assert.Null(updated.Color);
+        Assert.Null(updated.Tolerance);
+        Assert.Null(updated.RoughnessCode);
+        Assert.Null(updated.ThreadedHoleSpec);
+        Assert.Null(updated.InsertType);
+        Assert.Null(updated.InspectionLevel);
+        Assert.Null(updated.CustomNotes);
+        Assert.Equal("Configured", updated.Status);
+        Assert.Null(updated.AiSuggestedPrice);
+        Assert.Null(updated.ConfirmedUnitPrice);
+        Assert.NotEqual(before.Version, updated.ProjectVersion);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(0m, after.TotalEstimatedPrice);
+    }
+
+    [Fact]
     public async Task UpdatePart_PreviewDfmAndDrawingOnly_ShouldPreservePricingAndAdvanceVersion()
     {
         var project = await CreateTestProjectAsync();

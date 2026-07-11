@@ -403,22 +403,29 @@ public class ProjectManagementService : IProjectService
         if (request.MaterialName is not null) part.MaterialName = request.MaterialName;
         if (request.MaterialCode is not null) part.MaterialCode = request.MaterialCode;
         if (request.Quantity.HasValue) part.Quantity = request.Quantity.Value;
-        if (request.FinishType is not null) part.FinishType = request.FinishType;
-        if (request.Color is not null) part.Color = request.Color;
-        if (request.Tolerance is not null) part.Tolerance = request.Tolerance;
-        if (request.RoughnessCode is not null) part.RoughnessCode = request.RoughnessCode;
+        if (request.ClearFinishType) part.FinishType = null;
+        else if (request.FinishType is not null) part.FinishType = request.FinishType;
+        if (request.ClearColor) part.Color = null;
+        else if (request.Color is not null) part.Color = request.Color;
+        if (request.ClearTolerance) part.Tolerance = null;
+        else if (request.Tolerance is not null) part.Tolerance = request.Tolerance;
+        if (request.ClearRoughnessCode) part.RoughnessCode = null;
+        else if (request.RoughnessCode is not null) part.RoughnessCode = request.RoughnessCode;
         if (request.MarkingType is not null) part.MarkingType = request.MarkingType;
         if (request.MarkingText is not null) part.MarkingText = request.MarkingText;
         if (request.DfmAcknowledged.HasValue) part.DfmAcknowledged = request.DfmAcknowledged.Value;
         if (request.HasDfmWarnings.HasValue) part.HasDfmWarnings = request.HasDfmWarnings.Value;
         if (request.HasThreadedHoles.HasValue) part.HasThreadedHoles = request.HasThreadedHoles.Value;
-        if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
+        if (request.ClearThreadedHoleSpec) part.ThreadedHoleSpec = null;
+        else if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
         if (request.ThreadedHoleCount.HasValue) part.ThreadedHoleCount = request.ThreadedHoleCount.Value;
         if (request.HasInserts.HasValue) part.HasInserts = request.HasInserts.Value;
-        if (request.InsertType is not null) part.InsertType = request.InsertType;
+        if (request.ClearInsertType) part.InsertType = null;
+        else if (request.InsertType is not null) part.InsertType = request.InsertType;
         if (request.InsertCount.HasValue) part.InsertCount = request.InsertCount.Value;
         if (request.BagAndTag.HasValue) part.BagAndTag = request.BagAndTag.Value;
-        if (request.InspectionLevel is not null) part.InspectionLevel = request.InspectionLevel;
+        if (request.ClearInspectionLevel) part.InspectionLevel = null;
+        else if (request.InspectionLevel is not null) part.InspectionLevel = request.InspectionLevel;
         if (request.Certificates is not null) part.Certificates = [.. request.Certificates];
         if (request.DrawingFiles is not null) part.DrawingFiles = request.DrawingFiles.Select(attachment => attachment.ToAttachment()).ToList();
         if (request.SupplementaryFiles is not null) part.SupplementaryFiles = request.SupplementaryFiles.Select(attachment => attachment.ToAttachment()).ToList();
@@ -431,7 +438,8 @@ public class ProjectManagementService : IProjectService
         if (request.BodiesJson is not null) part.BodiesJson = request.BodiesJson;
         if (request.SelectedBodyIndex.HasValue) part.SelectedBodyIndex = request.SelectedBodyIndex.Value;
         if (request.ThreadsInserts is not null) part.ThreadsInserts = request.ThreadsInserts;
-        if (request.CustomNotes is not null) part.CustomNotes = request.CustomNotes;
+        if (request.ClearCustomNotes) part.CustomNotes = null;
+        else if (request.CustomNotes is not null) part.CustomNotes = request.CustomNotes;
 
         // If configuration is now complete, advance to Configured
         if (part.ProcessType != default && part.MaterialId.HasValue && part.Status == PartStatus.Uploaded)
@@ -1024,20 +1032,27 @@ public class ProjectManagementService : IProjectService
         (request.MaterialName is not null && !string.Equals(request.MaterialName, part.MaterialName, StringComparison.Ordinal)) ||
         (request.MaterialCode is not null && !string.Equals(request.MaterialCode, part.MaterialCode, StringComparison.Ordinal)) ||
         (request.Quantity.HasValue && request.Quantity.Value != part.Quantity) ||
-        (request.FinishType is not null && !string.Equals(request.FinishType, part.FinishType, StringComparison.Ordinal)) ||
-        (request.Color is not null && !string.Equals(request.Color, part.Color, StringComparison.Ordinal)) ||
-        (request.Tolerance is not null && !string.Equals(request.Tolerance, part.Tolerance, StringComparison.Ordinal)) ||
-        (request.RoughnessCode is not null && !string.Equals(request.RoughnessCode, part.RoughnessCode, StringComparison.Ordinal)) ||
+        (request.ClearFinishType && part.FinishType is not null) ||
+        (!request.ClearFinishType && request.FinishType is not null && !string.Equals(request.FinishType, part.FinishType, StringComparison.Ordinal)) ||
+        (request.ClearColor && part.Color is not null) ||
+        (!request.ClearColor && request.Color is not null && !string.Equals(request.Color, part.Color, StringComparison.Ordinal)) ||
+        (request.ClearTolerance && part.Tolerance is not null) ||
+        (!request.ClearTolerance && request.Tolerance is not null && !string.Equals(request.Tolerance, part.Tolerance, StringComparison.Ordinal)) ||
+        (request.ClearRoughnessCode && part.RoughnessCode is not null) ||
+        (!request.ClearRoughnessCode && request.RoughnessCode is not null && !string.Equals(request.RoughnessCode, part.RoughnessCode, StringComparison.Ordinal)) ||
         (request.MarkingType is not null && !string.Equals(request.MarkingType, part.MarkingType, StringComparison.Ordinal)) ||
         (request.MarkingText is not null && !string.Equals(request.MarkingText, part.MarkingText, StringComparison.Ordinal)) ||
         (request.HasThreadedHoles.HasValue && request.HasThreadedHoles.Value != part.HasThreadedHoles) ||
-        (request.ThreadedHoleSpec is not null && !string.Equals(request.ThreadedHoleSpec, part.ThreadedHoleSpec, StringComparison.Ordinal)) ||
+        (request.ClearThreadedHoleSpec && part.ThreadedHoleSpec is not null) ||
+        (!request.ClearThreadedHoleSpec && request.ThreadedHoleSpec is not null && !string.Equals(request.ThreadedHoleSpec, part.ThreadedHoleSpec, StringComparison.Ordinal)) ||
         (request.ThreadedHoleCount.HasValue && request.ThreadedHoleCount.Value != part.ThreadedHoleCount) ||
         (request.HasInserts.HasValue && request.HasInserts.Value != part.HasInserts) ||
-        (request.InsertType is not null && !string.Equals(request.InsertType, part.InsertType, StringComparison.Ordinal)) ||
+        (request.ClearInsertType && part.InsertType is not null) ||
+        (!request.ClearInsertType && request.InsertType is not null && !string.Equals(request.InsertType, part.InsertType, StringComparison.Ordinal)) ||
         (request.InsertCount.HasValue && request.InsertCount.Value != part.InsertCount) ||
         (request.BagAndTag.HasValue && request.BagAndTag.Value != part.BagAndTag) ||
-        (request.InspectionLevel is not null && !string.Equals(request.InspectionLevel, part.InspectionLevel, StringComparison.Ordinal)) ||
+        (request.ClearInspectionLevel && part.InspectionLevel is not null) ||
+        (!request.ClearInspectionLevel && request.InspectionLevel is not null && !string.Equals(request.InspectionLevel, part.InspectionLevel, StringComparison.Ordinal)) ||
         (request.Certificates is not null && !request.Certificates.SequenceEqual(part.Certificates, StringComparer.Ordinal)) ||
         (request.ProcessConfig is not null && !DictionaryEquals(request.ProcessConfig, part.ProcessConfig)) ||
         (request.SelectedBodyIndex.HasValue && request.SelectedBodyIndex.Value != part.SelectedBodyIndex) ||
