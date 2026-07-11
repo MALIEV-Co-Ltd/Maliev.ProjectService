@@ -11,10 +11,11 @@ namespace Maliev.ProjectService.Application.DTOs;
 public static class MappingExtensions
 {
     /// <summary>Maps a <see cref="Project"/> entity to a <see cref="ProjectDetailResponse"/>.</summary>
-    public static ProjectDetailResponse ToDetailResponse(this Project project)
+    public static ProjectDetailResponse ToDetailResponse(this Project project, uint version)
     {
         return new ProjectDetailResponse
         {
+            Version = version,
             Id = project.Id,
             ProjectNumber = project.ProjectNumber,
             CustomerId = project.CustomerId,
@@ -32,6 +33,7 @@ public static class MappingExtensions
             SourceProjectNumber = project.SourceProjectNumber,
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
+            LeadTimeCode = project.LeadTimeCode,
             ValidUntil = project.ValidUntil,
             CreatedBy = project.CreatedBy,
             CreatedByName = project.CreatedByName,
@@ -40,7 +42,7 @@ public static class MappingExtensions
             Parts = project.Parts
                 .Where(p => p.Status != PartStatus.Removed)
                 .OrderBy(p => p.PartNumber)
-                .Select(p => p.ToResponse())
+                .Select(p => p.ToResponse(version))
                 .ToList(),
             Notes = project.Notes
                 .OrderByDescending(n => n.CreatedAt)
@@ -100,10 +102,11 @@ public static class MappingExtensions
     }
 
     /// <summary>Maps a <see cref="ProjectPart"/> entity to a <see cref="ProjectPartResponse"/>.</summary>
-    public static ProjectPartResponse ToResponse(this ProjectPart part)
+    public static ProjectPartResponse ToResponse(this ProjectPart part, uint projectVersion)
     {
         return new ProjectPartResponse
         {
+            ProjectVersion = projectVersion,
             Id = part.Id,
             ProjectId = part.ProjectId,
             PartNumber = part.PartNumber,

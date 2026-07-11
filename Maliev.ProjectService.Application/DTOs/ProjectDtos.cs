@@ -46,6 +46,13 @@ public class UpdateProjectRequest
     /// <summary>Updated description.</summary>
     [MaxLength(2000)]
     public string? Description { get; set; }
+
+    /// <summary>Requested delivery lead-time tier.</summary>
+    [MaxLength(50)]
+    public string? LeadTimeCode { get; set; }
+
+    /// <summary>Optional project xmin version for optimistic concurrency.</summary>
+    public uint? ExpectedVersion { get; set; }
 }
 
 /// <summary>Filter parameters for project list queries.</summary>
@@ -99,6 +106,9 @@ public class ProjectPartAttachmentDto
 /// <summary>Request to add a part (file) to a project.</summary>
 public class AddProjectPartRequest
 {
+    /// <summary>Optional parent project xmin version for optimistic concurrency.</summary>
+    public uint? ExpectedVersion { get; set; }
+
     /// <summary>Original filename of the uploaded file.</summary>
     [Required, MaxLength(500)]
     public string FileName { get; set; } = string.Empty;
@@ -251,6 +261,9 @@ public class AddProjectPartRequest
 /// <summary>Request to update an existing part's configuration.</summary>
 public class UpdateProjectPartRequest
 {
+    /// <summary>Optional parent project xmin version for optimistic concurrency.</summary>
+    public uint? ExpectedVersion { get; set; }
+
     /// <summary>Manufacturing process.</summary>
     public ManufacturingProcess? ProcessType { get; set; }
 
@@ -538,6 +551,9 @@ public class ProjectPartPreviewResponse
 /// <summary>Detailed DTO for project detail view, including all parts and notes.</summary>
 public class ProjectDetailResponse
 {
+    /// <summary>PostgreSQL xmin version used for optimistic concurrency.</summary>
+    public uint Version { get; set; }
+
     /// <summary>Project unique identifier.</summary>
     public Guid Id { get; set; }
 
@@ -589,6 +605,9 @@ public class ProjectDetailResponse
     /// <summary>Currency code.</summary>
     public string Currency { get; set; } = "THB";
 
+    /// <summary>Requested delivery lead-time tier.</summary>
+    public string LeadTimeCode { get; set; } = "STANDARD";
+
     /// <summary>Quotation validity date.</summary>
     public DateTime? ValidUntil { get; set; }
 
@@ -614,6 +633,9 @@ public class ProjectDetailResponse
 /// <summary>DTO for a single project part, including pricing and status.</summary>
 public class ProjectPartResponse
 {
+    /// <summary>Parent project PostgreSQL xmin version used for optimistic concurrency.</summary>
+    public uint ProjectVersion { get; set; }
+
     /// <summary>Part unique identifier.</summary>
     public Guid Id { get; set; }
 

@@ -111,6 +111,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .IsRequired()
             .HasDefaultValue("THB");
 
+        builder.Property(p => p.LeadTimeCode)
+            .HasColumnName("lead_time_code")
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasDefaultValue("STANDARD");
+
         builder.Property(p => p.ValidUntil)
             .HasColumnName("valid_until");
 

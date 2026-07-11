@@ -178,7 +178,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal(id, dto.Id);
         Assert.Equal("PRJ-2026-0001", dto.ProjectNumber);
@@ -207,7 +207,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal(2, dto.Parts.Count);
         Assert.DoesNotContain(dto.Parts, p => p.FileName == "b.stl");
@@ -228,7 +228,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal("a.stl", dto.Parts[0].FileName);
         Assert.Equal("b.stl", dto.Parts[1].FileName);
@@ -356,7 +356,7 @@ public class Phase1DomainTests
             UpdatedAt = now
         };
 
-        var dto = part.ToResponse();
+        var dto = part.ToResponse(42);
 
         Assert.Equal(id, dto.Id);
         Assert.Equal(projectId, dto.ProjectId);

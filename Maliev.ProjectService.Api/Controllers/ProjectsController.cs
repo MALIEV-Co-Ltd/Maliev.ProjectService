@@ -6,6 +6,7 @@ using Maliev.Aspire.ServiceDefaults.IAM;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Asp.Versioning;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace Maliev.ProjectService.Api.Controllers;
@@ -129,6 +130,7 @@ public class ProjectsController : ControllerBase
     [RequirePermission(ProjectPermissions.Projects.Update)]
     [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ProjectDetailResponse>> Update(
         Guid id,
         [FromBody] UpdateProjectRequest request,
@@ -141,8 +143,19 @@ public class ProjectsController : ControllerBase
             ?? User.FindFirst("sub")?.Value
             ?? "unknown";
 
-        var project = await _projectService.UpdateAsync(id, request, principalId, ct);
-        return Ok(project);
+        try
+        {
+            var project = await _projectService.UpdateAsync(id, request, principalId, ct);
+            return Ok(project);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { error = "The project changed since it was loaded. Refresh and try again." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>Pins a project for quick customer access.</summary>
@@ -225,6 +238,7 @@ public class ProjectsController : ControllerBase
     [RequirePermission(ProjectPermissions.Projects.Update)]
     [ProducesResponseType(typeof(ProjectPartResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ProjectPartResponse>> AddPart(
         Guid id,
         [FromBody] AddProjectPartRequest request,
@@ -234,8 +248,19 @@ public class ProjectsController : ControllerBase
         if (scopeResult is not null) return scopeResult;
 
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
-        var part = await _projectService.AddPartAsync(id, request, principalId, ct);
-        return StatusCode(StatusCodes.Status201Created, part);
+        try
+        {
+            var part = await _projectService.AddPartAsync(id, request, principalId, ct);
+            return StatusCode(StatusCodes.Status201Created, part);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { error = "The project changed since it was loaded. Refresh and try again." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>Updates the configuration of an existing part.</summary>
@@ -243,6 +268,7 @@ public class ProjectsController : ControllerBase
     [RequirePermission(ProjectPermissions.Projects.Update)]
     [ProducesResponseType(typeof(ProjectPartResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ProjectPartResponse>> UpdatePart(
         Guid id,
         Guid partId,
@@ -253,8 +279,19 @@ public class ProjectsController : ControllerBase
         if (scopeResult is not null) return scopeResult;
 
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
-        var part = await _projectService.UpdatePartAsync(id, partId, request, principalId, ct);
-        return Ok(part);
+        try
+        {
+            var part = await _projectService.UpdatePartAsync(id, partId, request, principalId, ct);
+            return Ok(part);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { error = "The project changed since it was loaded. Refresh and try again." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>Removes a part from a project (soft-remove, marks as Removed).</summary>
@@ -263,14 +300,29 @@ public class ProjectsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> RemovePart(Guid id, Guid partId, CancellationToken ct = default)
+    public async Task<IActionResult> RemovePart(
+        Guid id,
+        Guid partId,
+        [FromQuery] uint? expectedVersion = null,
+        CancellationToken ct = default)
     {
         var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
         if (scopeResult is not null) return scopeResult;
 
         var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
-        await _projectService.RemovePartAsync(id, partId, principalId, ct);
-        return NoContent();
+        try
+        {
+            await _projectService.RemovePartAsync(id, partId, expectedVersion, principalId, ct);
+            return NoContent();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { error = "The project changed since it was loaded. Refresh and try again." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>

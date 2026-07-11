@@ -35,7 +35,7 @@ public interface IProjectService
     Task<ProjectPartResponse> UpdatePartAsync(Guid projectId, Guid partId, UpdateProjectPartRequest request, string principalId, CancellationToken ct = default);
 
     /// <summary>Removes a part from a project. Only valid before quotation is generated.</summary>
-    Task RemovePartAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);
+    Task RemovePartAsync(Guid projectId, Guid partId, uint? expectedVersion, string principalId, CancellationToken ct = default);
 
     /// <summary>Requests AI pricing for a specific part. Calls PricingService synchronously.</summary>
     Task<ProjectPartResponse> RequestPricingAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);
