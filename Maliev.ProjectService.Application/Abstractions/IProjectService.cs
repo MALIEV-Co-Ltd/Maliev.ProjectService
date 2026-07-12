@@ -19,6 +19,9 @@ public interface IProjectService
     /// <summary>Updates project metadata (title, description).</summary>
     Task<ProjectDetailResponse> UpdateAsync(Guid projectId, UpdateProjectRequest request, string principalId, CancellationToken ct = default);
 
+    /// <summary>Atomically updates caller-validated billing and shipping address references for an editable project.</summary>
+    Task<ProjectDetailResponse> UpdateAddressSelectionAsync(Guid projectId, UpdateProjectAddressSelectionRequest request, string principalId, CancellationToken ct = default);
+
     /// <summary>Sets whether a project is pinned for quick customer access.</summary>
     Task<ProjectDetailResponse> SetPinnedAsync(Guid projectId, bool isPinned, string principalId, CancellationToken ct = default);
 

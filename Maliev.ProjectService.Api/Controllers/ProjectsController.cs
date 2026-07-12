@@ -158,6 +158,62 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Atomically updates caller-validated billing and shipping address references for an editable project.
+    /// ProjectService treats the cross-service identifiers as opaque values.
+    /// </summary>
+    [HttpPut("{id:guid}/address-selection")]
+    [RequirePermission(ProjectPermissions.Projects.Update)]
+    [ProducesResponseType(typeof(ProjectDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ProjectDetailResponse>> UpdateAddressSelection(
+        Guid id,
+        [FromBody] UpdateProjectAddressSelectionRequest request,
+        CancellationToken ct = default)
+    {
+        if (request.SelectedBillingAddressId == Guid.Empty)
+        {
+            ModelState.AddModelError(
+                nameof(request.SelectedBillingAddressId),
+                "selectedBillingAddressId must be null or a non-empty GUID.");
+        }
+
+        if (request.SelectedShippingAddressId == Guid.Empty)
+        {
+            ModelState.AddModelError(
+                nameof(request.SelectedShippingAddressId),
+                "selectedShippingAddressId must be null or a non-empty GUID.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var scopeResult = await EnsureProjectInCustomerScopeAsync(id, ct);
+        if (scopeResult is not null) return scopeResult;
+
+        var principalId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? "unknown";
+
+        try
+        {
+            var project = await _projectService.UpdateAddressSelectionAsync(id, request, principalId, ct);
+            return Ok(project);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { error = "The project changed since it was loaded. Refresh and try again." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
     /// <summary>Pins a project for quick customer access.</summary>
     [HttpPost("{id:guid}/pin")]
     [RequirePermission(ProjectPermissions.Projects.Update)]

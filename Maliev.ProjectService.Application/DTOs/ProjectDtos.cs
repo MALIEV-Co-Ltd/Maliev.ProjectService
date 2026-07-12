@@ -55,6 +55,23 @@ public class UpdateProjectRequest
     public uint? ExpectedVersion { get; set; }
 }
 
+/// <summary>
+/// Request to atomically select billing and shipping address references for a project.
+/// The calling BFF must validate CustomerService ownership and address roles before submitting these opaque IDs.
+/// </summary>
+public class UpdateProjectAddressSelectionRequest
+{
+    /// <summary>Required project xmin version for optimistic concurrency.</summary>
+    [Required, Range(typeof(uint), "1", "4294967295")]
+    public uint? ExpectedVersion { get; set; }
+
+    /// <summary>CustomerService address selected for billing, or null to clear it.</summary>
+    public Guid? SelectedBillingAddressId { get; set; }
+
+    /// <summary>CustomerService address selected for shipping, or null to clear it.</summary>
+    public Guid? SelectedShippingAddressId { get; set; }
+}
+
 /// <summary>Filter parameters for project list queries.</summary>
 public class ProjectFilterRequest
 {
@@ -631,6 +648,12 @@ public class ProjectDetailResponse
 
     /// <summary>Requested delivery lead-time tier.</summary>
     public string LeadTimeCode { get; set; } = "STANDARD";
+
+    /// <summary>CustomerService address selected for billing while the project is editable.</summary>
+    public Guid? SelectedBillingAddressId { get; set; }
+
+    /// <summary>CustomerService address selected for shipping while the project is editable.</summary>
+    public Guid? SelectedShippingAddressId { get; set; }
 
     /// <summary>Quotation validity date.</summary>
     public DateTime? ValidUntil { get; set; }

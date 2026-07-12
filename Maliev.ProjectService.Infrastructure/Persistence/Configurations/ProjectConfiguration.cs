@@ -117,6 +117,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .IsRequired()
             .HasDefaultValue("STANDARD");
 
+        builder.Property(p => p.SelectedBillingAddressId)
+            .HasColumnName("selected_billing_address_id");
+
+        builder.Property(p => p.SelectedShippingAddressId)
+            .HasColumnName("selected_shipping_address_id");
+
         builder.Property(p => p.ValidUntil)
             .HasColumnName("valid_until");
 

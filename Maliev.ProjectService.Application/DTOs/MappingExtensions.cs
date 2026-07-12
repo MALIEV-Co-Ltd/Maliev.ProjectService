@@ -34,6 +34,8 @@ public static class MappingExtensions
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
             LeadTimeCode = project.LeadTimeCode,
+            SelectedBillingAddressId = project.SelectedBillingAddressId,
+            SelectedShippingAddressId = project.SelectedShippingAddressId,
             ValidUntil = project.ValidUntil,
             CreatedBy = project.CreatedBy,
             CreatedByName = project.CreatedByName,

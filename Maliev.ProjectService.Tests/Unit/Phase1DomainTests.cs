@@ -158,6 +158,8 @@ public class Phase1DomainTests
     {
         var id = Guid.NewGuid();
         var customerId = Guid.NewGuid();
+        var billingAddressId = Guid.NewGuid();
+        var shippingAddressId = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var project = new Project
         {
@@ -170,6 +172,8 @@ public class Phase1DomainTests
             Status = ProjectStatus.Configuring,
             Currency = "THB",
             TotalEstimatedPrice = 9999.50m,
+            SelectedBillingAddressId = billingAddressId,
+            SelectedShippingAddressId = shippingAddressId,
             CreatedBy = "user-123",
             CreatedByName = "John Doe",
             CreatedAt = now,
@@ -188,6 +192,8 @@ public class Phase1DomainTests
         Assert.Equal("Configuring", dto.Status);
         Assert.Equal("THB", dto.Currency);
         Assert.Equal(9999.50m, dto.TotalEstimatedPrice);
+        Assert.Equal(billingAddressId, dto.SelectedBillingAddressId);
+        Assert.Equal(shippingAddressId, dto.SelectedShippingAddressId);
         Assert.Empty(dto.Parts);
         Assert.Empty(dto.Notes);
     }

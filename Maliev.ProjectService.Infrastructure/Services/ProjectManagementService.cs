@@ -216,6 +216,28 @@ public class ProjectManagementService : IProjectService
     }
 
     /// <inheritdoc />
+    public async Task<ProjectDetailResponse> UpdateAddressSelectionAsync(
+        Guid projectId,
+        UpdateProjectAddressSelectionRequest request,
+        string principalId,
+        CancellationToken ct = default)
+    {
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        EnsureProjectAllowsCommercialChange(project);
+        ApplyExpectedVersion(project, request.ExpectedVersion);
+
+        project.SelectedBillingAddressId = request.SelectedBillingAddressId;
+        project.SelectedShippingAddressId = request.SelectedShippingAddressId;
+        project.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
+        return project.ToDetailResponse(GetProjectVersion(project));
+    }
+
+    /// <inheritdoc />
     public async Task<ProjectDetailResponse> SetPinnedAsync(
         Guid projectId,
         bool isPinned,
