@@ -65,45 +65,45 @@ public class Phase1MessagingTests : IAsyncLifetime
 
     private static JobCreatedEvent MakeJobCreatedEvent(Guid jobId, Guid orderId, Guid orderItemId) =>
         new(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "JobCreatedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "JobCreatedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "JobService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  Guid.NewGuid(),
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "JobService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new JobCreatedEventPayload(
-                JobId:       jobId,
-                OrderId:     orderId,
+                JobId: jobId,
+                OrderId: orderId,
                 OrderItemId: orderItemId,
                 ProcessType: "FDM",
-                JobNumber:   "JOB-2026-0001",
-                CreatedAt:   DateTimeOffset.UtcNow
+                JobNumber: "JOB-2026-0001",
+                CreatedAt: DateTimeOffset.UtcNow
             )
         );
 
     private static PaymentCompletedEvent MakePaymentCompletedEvent(Guid orderId, Guid paymentId) =>
         new(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "PaymentCompletedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "PaymentCompletedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "PaymentService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  Guid.NewGuid(),
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "PaymentService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new PaymentCompletedEventPayload(
-                OrderId:     orderId,
+                OrderId: orderId,
                 OrderNumber: "ORD-001",
-                CustomerId:  Guid.NewGuid().ToString(),
-                PaymentId:   paymentId,
-                Amount:      5000.0,
-                Currency:    "THB"
+                CustomerId: Guid.NewGuid().ToString(),
+                PaymentId: paymentId,
+                Amount: 5000.0,
+                Currency: "THB"
             )
         );
 
@@ -531,23 +531,23 @@ public class Phase1MessagingTests : IAsyncLifetime
         var customerId = Guid.NewGuid();
 
         var evt = new ProjectCreatedEvent(
-            MessageId:      Guid.NewGuid(),
-            MessageName:    "ProjectCreatedEvent",
-            MessageType:    MessageType.Event,
+            MessageId: Guid.NewGuid(),
+            MessageName: "ProjectCreatedEvent",
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
-            PublishedBy:    "ProjectService",
-            ConsumedBy:     Array.Empty<string>(),
-            CorrelationId:  projectId,
-            CausationId:    null,
-            OccurredAtUtc:  DateTimeOffset.UtcNow,
-            IsPublic:       false,
+            PublishedBy: "ProjectService",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: projectId,
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
             Payload: new ProjectCreatedEventPayload(
-                ProjectId:     projectId,
+                ProjectId: projectId,
                 ProjectNumber: "PRJ-2026-0001",
-                CustomerId:    customerId,
-                CustomerName:  "Acme Corp",
-                CreatedBy:     "user-abc",
-                CreatedAt:     DateTimeOffset.UtcNow
+                CustomerId: customerId,
+                CustomerName: "Acme Corp",
+                CreatedBy: "user-abc",
+                CreatedAt: DateTimeOffset.UtcNow
             )
         );
 
@@ -602,11 +602,11 @@ public class Phase1MessagingTests : IAsyncLifetime
             CorrelationId: projectId, CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow, IsPublic: false,
             Payload: new ProjectStatusChangedEventPayload(
-                ProjectId:     projectId,
+                ProjectId: projectId,
                 ProjectNumber: "PRJ-2026-0001",
-                OldStatus:     "Delivered",
-                NewStatus:     "Paid",
-                ChangedAt:     DateTimeOffset.UtcNow
+                OldStatus: "Delivered",
+                NewStatus: "Paid",
+                ChangedAt: DateTimeOffset.UtcNow
             )
         );
 
