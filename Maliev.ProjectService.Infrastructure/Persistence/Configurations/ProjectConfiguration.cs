@@ -57,12 +57,47 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasIndex(p => p.Status)
             .HasDatabaseName("idx_projects_status");
 
+        builder.HasIndex(p => new { p.Status, p.UpdatedAt })
+            .HasDatabaseName("idx_projects_status_updated_at");
+
+        builder.Property(p => p.IsPinned)
+            .HasColumnName("is_pinned")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(p => p.IsArchived)
+            .HasColumnName("is_archived")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.HasIndex(p => new { p.CustomerId, p.IsArchived, p.IsPinned, p.UpdatedAt })
+            .HasDatabaseName("idx_projects_customer_archive_pin_updated");
+
         builder.Property(p => p.QuotationId)
             .HasColumnName("quotation_id");
 
         builder.Property(p => p.QuotationNumber)
             .HasColumnName("quotation_number")
             .HasMaxLength(50);
+
+        builder.Property(p => p.CurrentQuotationVersionId)
+            .HasColumnName("current_quotation_version_id");
+
+        builder.Property(p => p.CurrentQuotationVersionNumber)
+            .HasColumnName("current_quotation_version_number");
+
+        builder.Property(p => p.SourceProjectId)
+            .HasColumnName("source_project_id");
+
+        builder.Property(p => p.SourceProjectNumber)
+            .HasColumnName("source_project_number")
+            .HasMaxLength(30);
+
+        builder.HasIndex(p => p.SourceProjectId)
+            .HasDatabaseName("idx_projects_source_project_id");
+
+        builder.HasIndex(p => p.CurrentQuotationVersionId)
+            .HasDatabaseName("idx_projects_current_quotation_version_id");
 
         builder.Property(p => p.TotalEstimatedPrice)
             .HasColumnName("total_estimated_price")
@@ -75,6 +110,18 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasMaxLength(3)
             .IsRequired()
             .HasDefaultValue("THB");
+
+        builder.Property(p => p.LeadTimeCode)
+            .HasColumnName("lead_time_code")
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasDefaultValue("STANDARD");
+
+        builder.Property(p => p.SelectedBillingAddressId)
+            .HasColumnName("selected_billing_address_id");
+
+        builder.Property(p => p.SelectedShippingAddressId)
+            .HasColumnName("selected_shipping_address_id");
 
         builder.Property(p => p.ValidUntil)
             .HasColumnName("valid_until");
@@ -115,12 +162,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasMany(p => p.Parts)
             .WithOne(pp => pp.Project)
             .HasForeignKey(pp => pp.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Navigation: notes
         builder.HasMany(p => p.Notes)
             .WithOne(n => n.Project)
             .HasForeignKey(n => n.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

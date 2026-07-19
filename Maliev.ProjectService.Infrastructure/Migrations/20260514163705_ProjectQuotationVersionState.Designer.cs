@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ProjectService.Infrastructure.Migrations
 {
     [DbContext(typeof(ProjectDbContext))]
-    [Migration("20260316160632_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260514163705_ProjectQuotationVersionState")]
+    partial class ProjectQuotationVersionState
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -58,6 +58,14 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasDefaultValue("THB")
                         .HasColumnName("currency");
 
+                    b.Property<Guid?>("CurrentQuotationVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_quotation_version_id");
+
+                    b.Property<int?>("CurrentQuotationVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_quotation_version_number");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
@@ -93,6 +101,15 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("quotation_number");
+
+                    b.Property<Guid?>("SourceProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_project_id");
+
+                    b.Property<string>("SourceProjectNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source_project_number");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -130,6 +147,9 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_projects");
 
+                    b.HasIndex("CurrentQuotationVersionId")
+                        .HasDatabaseName("idx_projects_current_quotation_version_id");
+
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("idx_projects_customer_id");
 
@@ -137,8 +157,14 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("idx_projects_project_number");
 
+                    b.HasIndex("SourceProjectId")
+                        .HasDatabaseName("idx_projects_source_project_id");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("idx_projects_status");
+
+                    b.HasIndex("Status", "UpdatedAt")
+                        .HasDatabaseName("idx_projects_status_updated_at");
 
                     b.ToTable("projects", (string)null);
                 });
@@ -199,6 +225,20 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("ai_suggested_price");
 
+                    b.Property<bool>("BagAndTag")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("bag_and_tag");
+
+                    b.Property<string>("BodiesJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("bodies_json");
+
+                    b.Property<int?>("BodyCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("body_count");
+
                     b.Property<decimal?>("BoundingBoxX")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -213,6 +253,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("bounding_box_z");
+
+                    b.Property<string>("Certificates")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("certificates")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("Color")
                         .HasMaxLength(200)
@@ -235,6 +282,19 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("custom_notes");
 
+                    b.Property<bool>("DfmAcknowledged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("dfm_acknowledged");
+
+                    b.Property<string>("DrawingFiles")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("drawing_files")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<Guid?>("FileId")
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
@@ -255,6 +315,45 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("finish_type");
 
+                    b.Property<string>("GlbStoragePath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("glb_storage_path");
+
+                    b.Property<bool>("HasDfmWarnings")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_dfm_warnings");
+
+                    b.Property<bool>("HasInserts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_inserts");
+
+                    b.Property<bool>("HasThreadedHoles")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_threaded_holes");
+
+                    b.Property<int>("InsertCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("insert_count");
+
+                    b.Property<string>("InsertType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("insert_type");
+
+                    b.Property<string>("InspectionLevel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("inspection_level");
+
                     b.Property<bool?>("IsManifold")
                         .HasColumnType("boolean")
                         .HasColumnName("is_manifold");
@@ -262,6 +361,16 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.Property<Guid?>("JobId")
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
+
+                    b.Property<string>("MarkingText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("marking_text");
+
+                    b.Property<string>("MarkingType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("marking_type");
 
                     b.Property<string>("MaterialCode")
                         .HasMaxLength(100)
@@ -285,6 +394,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_item_id");
 
+                    b.Property<string>("OverlayPaths")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("overlay_paths")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<int>("PartNumber")
                         .HasColumnType("integer")
                         .HasColumnName("part_number");
@@ -303,6 +419,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("pricing_strategy");
 
+                    b.Property<string>("ProcessConfig")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("process_config")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<string>("ProcessType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -319,11 +442,27 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("quantity");
 
+                    b.Property<string>("RoughnessCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("roughness_code");
+
+                    b.Property<int?>("SelectedBodyIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("selected_body_index");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
+
+                    b.Property<string>("SupplementaryFiles")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("supplementary_files")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<decimal?>("SupportVolumeCm3")
                         .HasPrecision(18, 6)
@@ -335,10 +474,31 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("numeric(18,6)")
                         .HasColumnName("surface_area_cm2");
 
+                    b.Property<int>("ThreadedHoleCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("threaded_hole_count");
+
+                    b.Property<string>("ThreadedHoleSpec")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("threaded_hole_spec");
+
                     b.Property<string>("ThreadsInserts")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("threads_inserts");
+
+                    b.Property<string>("ThumbnailLargeGcsPath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("thumbnail_large_gcs_path");
+
+                    b.Property<string>("ThumbnailSmallGcsPath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("thumbnail_small_gcs_path");
 
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(2000)
@@ -379,7 +539,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Notes")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_notes_projects_project_id");
 
@@ -391,7 +551,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Parts")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_parts_projects_project_id");
 

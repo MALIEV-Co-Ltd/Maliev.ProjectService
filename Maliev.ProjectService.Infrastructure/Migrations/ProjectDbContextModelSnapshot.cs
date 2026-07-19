@@ -17,7 +17,7 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -55,6 +55,14 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasDefaultValue("THB")
                         .HasColumnName("currency");
 
+                    b.Property<Guid?>("CurrentQuotationVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_quotation_version_id");
+
+                    b.Property<int?>("CurrentQuotationVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_quotation_version_number");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
@@ -70,11 +78,31 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsPinned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_pinned");
+
+                    b.Property<string>("LeadTimeCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("STANDARD")
+                        .HasColumnName("lead_time_code");
 
                     b.Property<string>("ProjectNumber")
                         .IsRequired()
@@ -90,6 +118,23 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("quotation_number");
+
+                    b.Property<Guid?>("SelectedBillingAddressId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("selected_billing_address_id");
+
+                    b.Property<Guid?>("SelectedShippingAddressId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("selected_shipping_address_id");
+
+                    b.Property<Guid?>("SourceProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_project_id");
+
+                    b.Property<string>("SourceProjectNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source_project_number");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -127,6 +172,9 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_projects");
 
+                    b.HasIndex("CurrentQuotationVersionId")
+                        .HasDatabaseName("idx_projects_current_quotation_version_id");
+
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("idx_projects_customer_id");
 
@@ -134,8 +182,17 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("idx_projects_project_number");
 
+                    b.HasIndex("SourceProjectId")
+                        .HasDatabaseName("idx_projects_source_project_id");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("idx_projects_status");
+
+                    b.HasIndex("Status", "UpdatedAt")
+                        .HasDatabaseName("idx_projects_status_updated_at");
+
+                    b.HasIndex("CustomerId", "IsArchived", "IsPinned", "UpdatedAt")
+                        .HasDatabaseName("idx_projects_customer_archive_pin_updated");
 
                     b.ToTable("projects", (string)null);
                 });
@@ -196,6 +253,20 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("ai_suggested_price");
 
+                    b.Property<bool>("BagAndTag")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("bag_and_tag");
+
+                    b.Property<string>("BodiesJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("bodies_json");
+
+                    b.Property<int?>("BodyCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("body_count");
+
                     b.Property<decimal?>("BoundingBoxX")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -210,6 +281,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("bounding_box_z");
+
+                    b.Property<string>("Certificates")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("certificates")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("Color")
                         .HasMaxLength(200)
@@ -232,6 +310,19 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("custom_notes");
 
+                    b.Property<bool>("DfmAcknowledged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("dfm_acknowledged");
+
+                    b.Property<string>("DrawingFiles")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("drawing_files")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<Guid?>("FileId")
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
@@ -252,6 +343,45 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("finish_type");
 
+                    b.Property<string>("GlbStoragePath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("glb_storage_path");
+
+                    b.Property<bool>("HasDfmWarnings")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_dfm_warnings");
+
+                    b.Property<bool>("HasInserts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_inserts");
+
+                    b.Property<bool>("HasThreadedHoles")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_threaded_holes");
+
+                    b.Property<int>("InsertCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("insert_count");
+
+                    b.Property<string>("InsertType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("insert_type");
+
+                    b.Property<string>("InspectionLevel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("inspection_level");
+
                     b.Property<bool?>("IsManifold")
                         .HasColumnType("boolean")
                         .HasColumnName("is_manifold");
@@ -259,6 +389,16 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.Property<Guid?>("JobId")
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
+
+                    b.Property<string>("MarkingText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("marking_text");
+
+                    b.Property<string>("MarkingType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("marking_type");
 
                     b.Property<string>("MaterialCode")
                         .HasMaxLength(100)
@@ -282,6 +422,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_item_id");
 
+                    b.Property<string>("OverlayPaths")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("overlay_paths")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<int>("PartNumber")
                         .HasColumnType("integer")
                         .HasColumnName("part_number");
@@ -300,6 +447,13 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("pricing_strategy");
 
+                    b.Property<string>("ProcessConfig")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("process_config")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<string>("ProcessType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -316,11 +470,27 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("quantity");
 
+                    b.Property<string>("RoughnessCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("roughness_code");
+
+                    b.Property<int?>("SelectedBodyIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("selected_body_index");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
+
+                    b.Property<string>("SupplementaryFiles")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("supplementary_files")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<decimal?>("SupportVolumeCm3")
                         .HasPrecision(18, 6)
@@ -332,10 +502,31 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                         .HasColumnType("numeric(18,6)")
                         .HasColumnName("surface_area_cm2");
 
+                    b.Property<int>("ThreadedHoleCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("threaded_hole_count");
+
+                    b.Property<string>("ThreadedHoleSpec")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("threaded_hole_spec");
+
                     b.Property<string>("ThreadsInserts")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("threads_inserts");
+
+                    b.Property<string>("ThumbnailLargeGcsPath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("thumbnail_large_gcs_path");
+
+                    b.Property<string>("ThumbnailSmallGcsPath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("thumbnail_small_gcs_path");
 
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(2000)
@@ -371,12 +562,230 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.ToTable("project_parts", (string)null);
                 });
 
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("Consumed")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed");
+
+                    b.Property<Guid>("ConsumerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consumer_id");
+
+                    b.Property<DateTime?>("Delivered")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered");
+
+                    b.Property<DateTime?>("ExpirationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expiration_time");
+
+                    b.Property<long?>("LastSequenceNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_sequence_number");
+
+                    b.Property<Guid>("LockId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lock_id");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<int>("ReceiveCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("receive_count");
+
+                    b.Property<DateTime>("Received")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inbox_state");
+
+                    b.HasAlternateKey("MessageId", "ConsumerId")
+                        .HasName("ak_inbox_state_message_id_consumer_id");
+
+                    b.HasIndex("Delivered")
+                        .HasDatabaseName("ix_inbox_state_delivered");
+
+                    b.ToTable("inbox_state");
+                });
+
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
+                {
+                    b.Property<long>("SequenceNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence_number");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("SequenceNumber"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("DestinationAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("destination_address");
+
+                    b.Property<DateTime?>("EnqueueTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enqueue_time");
+
+                    b.Property<DateTime?>("ExpirationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expiration_time");
+
+                    b.Property<string>("FaultAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("fault_address");
+
+                    b.Property<string>("Headers")
+                        .HasColumnType("text")
+                        .HasColumnName("headers");
+
+                    b.Property<Guid?>("InboxConsumerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inbox_consumer_id");
+
+                    b.Property<Guid?>("InboxMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inbox_message_id");
+
+                    b.Property<Guid?>("InitiatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initiator_id");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("message_type");
+
+                    b.Property<Guid?>("OutboxId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbox_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("text")
+                        .HasColumnName("properties");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("ResponseAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("response_address");
+
+                    b.Property<DateTime>("SentTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_time");
+
+                    b.Property<string>("SourceAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_address");
+
+                    b.HasKey("SequenceNumber")
+                        .HasName("pk_outbox_message");
+
+                    b.HasIndex("EnqueueTime")
+                        .HasDatabaseName("ix_outbox_message_enqueue_time");
+
+                    b.HasIndex("ExpirationTime")
+                        .HasDatabaseName("ix_outbox_message_expiration_time");
+
+                    b.HasIndex("OutboxId", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_outbox_message_outbox_id_sequence_number");
+
+                    b.HasIndex("InboxMessageId", "InboxConsumerId", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_outbox_message_inbox_message_id_inbox_consumer_id_sequence_~");
+
+                    b.ToTable("outbox_message");
+                });
+
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxState", b =>
+                {
+                    b.Property<Guid>("OutboxId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbox_id");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<DateTime?>("Delivered")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered");
+
+                    b.Property<long?>("LastSequenceNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_sequence_number");
+
+                    b.Property<Guid>("LockId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lock_id");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("OutboxId")
+                        .HasName("pk_outbox_state");
+
+                    b.HasIndex("Created")
+                        .HasDatabaseName("ix_outbox_state_created");
+
+                    b.ToTable("outbox_state");
+                });
+
             modelBuilder.Entity("Maliev.ProjectService.Domain.Entities.ProjectNote", b =>
                 {
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Notes")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_notes_projects_project_id");
 
@@ -388,11 +797,25 @@ namespace Maliev.ProjectService.Infrastructure.Migrations
                     b.HasOne("Maliev.ProjectService.Domain.Entities.Project", "Project")
                         .WithMany("Parts")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired()
                         .HasConstraintName("fk_project_parts_projects_project_id");
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
+                {
+                    b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)
+                        .WithMany()
+                        .HasForeignKey("OutboxId")
+                        .HasConstraintName("fk_outbox_message__outbox_state_outbox_id");
+
+                    b.HasOne("MassTransit.EntityFrameworkCoreIntegration.InboxState", null)
+                        .WithMany()
+                        .HasForeignKey("InboxMessageId", "InboxConsumerId")
+                        .HasPrincipalKey("MessageId", "ConsumerId")
+                        .HasConstraintName("fk_outbox_message_inbox_state_inbox_message_id_inbox_consumer_~");
                 });
 
             modelBuilder.Entity("Maliev.ProjectService.Domain.Entities.Project", b =>

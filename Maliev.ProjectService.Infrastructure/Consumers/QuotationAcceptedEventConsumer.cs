@@ -1,6 +1,7 @@
 using MassTransit;
 using Maliev.MessagingContracts.Contracts.Quotations;
 using Maliev.ProjectService.Application.Abstractions;
+using Maliev.ProjectService.Application.DTOs;
 using Maliev.ProjectService.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Maliev.ProjectService.Infrastructure.Persistence;
@@ -35,6 +36,12 @@ public class QuotationAcceptedEventConsumer : IConsumer<QuotationAcceptedEvent>
     public async Task Consume(ConsumeContext<QuotationAcceptedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring QuotationAcceptedEvent without payload");
+            return;
+        }
+
         _logger.LogInformation("Received QuotationAccepted for quotation {QuotationId}", payload.QuotationId);
 
         // Find the project that owns this quotation
@@ -49,7 +56,7 @@ public class QuotationAcceptedEventConsumer : IConsumer<QuotationAcceptedEvent>
         }
 
         // Advance project to accepted state and trigger order creation
-        await _projectService.AcceptQuotationAsync(project.Id, "system", context.CancellationToken);
+        await _projectService.AcceptQuotationAsync(project.Id, new AcceptQuotationRequest(), "system", context.CancellationToken);
 
         _logger.LogInformation("Project {ProjectNumber} advanced to QuotationAccepted via event from QuotationService", project.ProjectNumber);
     }

@@ -29,17 +29,44 @@ public class Project
     /// <summary>Current lifecycle status of the project.</summary>
     public ProjectStatus Status { get; set; } = ProjectStatus.Draft;
 
+    /// <summary>Whether the customer has pinned this project for quick access.</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>Whether the customer has archived this project from active Make Studio views.</summary>
+    public bool IsArchived { get; set; }
+
     /// <summary>Reference to the generated quotation in QuotationService. Null until generated.</summary>
     public Guid? QuotationId { get; set; }
 
     /// <summary>Human-readable quotation number. Denormalized for display.</summary>
     public string? QuotationNumber { get; set; }
 
+    /// <summary>Reference to the current immutable quotation version in QuotationService.</summary>
+    public Guid? CurrentQuotationVersionId { get; set; }
+
+    /// <summary>Current immutable quotation version number in QuotationService.</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
+    /// <summary>Source project identifier when this project was duplicated for reorder or revision work.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project number when this project was duplicated for reorder or revision work.</summary>
+    public string? SourceProjectNumber { get; set; }
+
     /// <summary>Sum of all confirmed part prices. Recomputed when parts are confirmed.</summary>
     public decimal TotalEstimatedPrice { get; set; }
 
     /// <summary>Currency code (ISO 4217). Defaults to THB.</summary>
     public string Currency { get; set; } = "THB";
+
+    /// <summary>Requested delivery lead-time tier. Defaults to STANDARD.</summary>
+    public string LeadTimeCode { get; set; } = "STANDARD";
+
+    /// <summary>CustomerService address selected for billing while this project remains editable.</summary>
+    public Guid? SelectedBillingAddressId { get; set; }
+
+    /// <summary>CustomerService address selected for shipping while this project remains editable.</summary>
+    public Guid? SelectedShippingAddressId { get; set; }
 
     /// <summary>Date until which the quotation is valid. Set when quotation is generated.</summary>
     public DateTime? ValidUntil { get; set; }

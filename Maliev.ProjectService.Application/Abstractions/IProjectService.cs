@@ -19,6 +19,15 @@ public interface IProjectService
     /// <summary>Updates project metadata (title, description).</summary>
     Task<ProjectDetailResponse> UpdateAsync(Guid projectId, UpdateProjectRequest request, string principalId, CancellationToken ct = default);
 
+    /// <summary>Atomically updates caller-validated billing and shipping address references for an editable project.</summary>
+    Task<ProjectDetailResponse> UpdateAddressSelectionAsync(Guid projectId, UpdateProjectAddressSelectionRequest request, string principalId, CancellationToken ct = default);
+
+    /// <summary>Sets whether a project is pinned for quick customer access.</summary>
+    Task<ProjectDetailResponse> SetPinnedAsync(Guid projectId, bool isPinned, string principalId, CancellationToken ct = default);
+
+    /// <summary>Sets whether a project is archived from active customer views.</summary>
+    Task<ProjectDetailResponse> SetArchivedAsync(Guid projectId, bool isArchived, string principalId, CancellationToken ct = default);
+
     /// <summary>Soft-deletes a project. Only Draft projects may be deleted.</summary>
     Task DeleteAsync(Guid projectId, string principalId, CancellationToken ct = default);
 
@@ -29,7 +38,7 @@ public interface IProjectService
     Task<ProjectPartResponse> UpdatePartAsync(Guid projectId, Guid partId, UpdateProjectPartRequest request, string principalId, CancellationToken ct = default);
 
     /// <summary>Removes a part from a project. Only valid before quotation is generated.</summary>
-    Task RemovePartAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);
+    Task RemovePartAsync(Guid projectId, Guid partId, uint? expectedVersion, string principalId, CancellationToken ct = default);
 
     /// <summary>Requests AI pricing for a specific part. Calls PricingService synchronously.</summary>
     Task<ProjectPartResponse> RequestPricingAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);
@@ -44,7 +53,10 @@ public interface IProjectService
     Task<ProjectDetailResponse> MarkQuotationSentAsync(Guid projectId, string principalId, CancellationToken ct = default);
 
     /// <summary>Manually marks quotation as accepted (for employee-assisted acceptance). Triggers order creation event.</summary>
-    Task<ProjectDetailResponse> AcceptQuotationAsync(Guid projectId, string principalId, CancellationToken ct = default);
+    Task<ProjectDetailResponse> AcceptQuotationAsync(Guid projectId, AcceptQuotationRequest request, string principalId, CancellationToken ct = default);
+
+    /// <summary>Routes a customer project to employee review and records the customer's note.</summary>
+    Task<ProjectDetailResponse> RequestCustomerReviewAsync(Guid projectId, RequestProjectReviewRequest request, string principalId, string principalName, CancellationToken ct = default);
 
     /// <summary>Updates project status (used by event consumers).</summary>
     Task UpdateStatusAsync(Guid projectId, string newStatus, CancellationToken ct = default);

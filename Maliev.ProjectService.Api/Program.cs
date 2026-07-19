@@ -4,6 +4,7 @@ using Maliev.ProjectService.Infrastructure.Consumers;
 using Maliev.ProjectService.Infrastructure.Persistence;
 using Maliev.ProjectService.Infrastructure.Services;
 using Maliev.Aspire.ServiceDefaults;
+using MassTransit;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -32,9 +33,18 @@ try
     builder.AddStandardCache("project:");
     builder.AddMassTransitWithRabbitMq(x =>
     {
+        x.AddEntityFrameworkOutbox<ProjectDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
+
         x.AddConsumer<QuotationAcceptedEventConsumer>();
         x.AddConsumer<OrderCreatedEventConsumer>();
         x.AddConsumer<JobStatusChangedEventConsumer>();
+        x.AddConsumer<ProjectJobCreatedEventConsumer>();
+        x.AddConsumer<ProjectPaymentCompletedEventConsumer>();
+        x.AddConsumer<SearchReindexRequestedConsumer>();
     });
 
     builder.AddStandardCors();
@@ -55,15 +65,15 @@ try
     builder.Services.AddScoped<IProjectService, ProjectManagementService>();
 
     // External HTTP clients
-    builder.Services.AddHttpClient<IPricingServiceClient, PricingServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["PricingService:BaseUrl"] ?? "http://pricing-service");
-    }).AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
-
-    builder.Services.AddHttpClient<IQuotationServiceClient, QuotationServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["QuotationService:BaseUrl"] ?? "http://quotation-service");
-    }).AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
+    builder.AddAuthenticatedServiceClient<IPricingServiceClient, PricingServiceClient>(
+        "PricingService",
+        sourceServiceName: "project");
+    builder.AddAuthenticatedServiceClient<IQuotationServiceClient, QuotationServiceClient>(
+        "QuotationService",
+        sourceServiceName: "project");
+    builder.AddAuthenticatedServiceClient<IJobServiceClient, JobServiceClient>(
+        "JobService",
+        sourceServiceName: "project");
 
     builder.Services.AddPermissionAuthorization();
     builder.AddIAMServiceClient("project");
