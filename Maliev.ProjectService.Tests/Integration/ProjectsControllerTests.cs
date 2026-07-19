@@ -639,6 +639,716 @@ public class ProjectsControllerTests : BaseIntegrationTest
         Assert.Equal(baseline.CustomerReviewCount + 1, reviewedStats.CustomerReviewCount);
     }
 
+    [Fact]
+    public async Task GetById_AfterPartMutation_ShouldExposeAdvancedProjectVersionOnProjectAndPart()
+    {
+        var project = await CreateTestProjectAsync();
+
+        var part = await AddTestPartAsync(project.Id);
+
+        Assert.NotEqual(0u, project.Version);
+        Assert.NotEqual(project.Version, part.ProjectVersion);
+
+        var response = await Client.GetAsync($"/project/v1/projects/{project.Id}");
+        response.EnsureSuccessStatusCode();
+        var fetched = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+
+        Assert.NotNull(fetched);
+        Assert.Equal(part.ProjectVersion, fetched.Version);
+        Assert.Equal(fetched.Version, Assert.Single(fetched.Parts).ProjectVersion);
+    }
+
+    [Fact]
+    public async Task Update_WithExpectedVersion_ShouldRoundTripLeadTimeAndRejectStaleWriteWithoutMutation()
+    {
+        var project = await CreateTestProjectAsync();
+        var originalVersion = project.Version;
+
+        var firstResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Priority enclosure",
+                Description = "First accepted edit",
+                LeadTimeCode = "EXPRESS",
+                ExpectedVersion = originalVersion
+            });
+        firstResponse.EnsureSuccessStatusCode();
+        var updated = await firstResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+
+        Assert.NotNull(updated);
+        Assert.Equal("EXPRESS", updated.LeadTimeCode);
+        Assert.NotEqual(originalVersion, updated.Version);
+
+        var staleResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Stale overwrite",
+                Description = "Must not persist",
+                LeadTimeCode = "STANDARD",
+                ExpectedVersion = originalVersion
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var fetchedResponse = await Client.GetAsync($"/project/v1/projects/{project.Id}");
+        fetchedResponse.EnsureSuccessStatusCode();
+        var fetched = await fetchedResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+
+        Assert.NotNull(fetched);
+        Assert.Equal("Priority enclosure", fetched.Title);
+        Assert.Equal("First accepted edit", fetched.Description);
+        Assert.Equal("EXPRESS", fetched.LeadTimeCode);
+        Assert.Equal(updated.Version, fetched.Version);
+    }
+
+    [Fact]
+    public async Task UpdatePart_PricingRelevantChange_ShouldInvalidatePriceAndRecalculateAggregate()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+        var confirmed = Assert.Single(before.Parts);
+        Assert.Equal("Confirmed", confirmed.Status);
+        Assert.True(before.TotalEstimatedPrice > 0m);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                Quantity = confirmed.Quantity + 1,
+                ExpectedVersion = before.Version
+            });
+
+        updateResponse.EnsureSuccessStatusCode();
+        var updatedPart = await updateResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(updatedPart);
+        Assert.Equal("Configured", updatedPart.Status);
+        Assert.Null(updatedPart.AiSuggestedPrice);
+        Assert.Null(updatedPart.ConfirmedUnitPrice);
+        Assert.NotEqual(before.Version, updatedPart.ProjectVersion);
+
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(0m, after.TotalEstimatedPrice);
+        Assert.Equal(updatedPart.ProjectVersion, after.Version);
+    }
+
+    [Fact]
+    public async Task UpdatePart_ExplicitOptionalFieldClears_ShouldRoundTripAndInvalidatePricing()
+    {
+        var project = await CreateTestProjectAsync();
+        var addResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts",
+            new AddProjectPartRequest
+            {
+                FileName = "clearable-options.step",
+                ProcessType = Domain.Enums.ManufacturingProcess.CNC_Milling,
+                MaterialId = Guid.NewGuid(),
+                MaterialName = "Aluminium 6061",
+                MaterialCode = "AL6061",
+                Quantity = 2,
+                FinishType = "Anodized",
+                Color = "Black",
+                Tolerance = "ISO-2768-f",
+                RoughnessCode = "RA_1_6",
+                ThreadedHoleSpec = "M4",
+                ThreadedHoleCount = 4,
+                InsertType = "HELICOIL_M4",
+                InsertCount = 2,
+                InspectionLevel = "CMM",
+                CustomNotes = "Protect cosmetic face",
+                VolumeCm3 = 10m,
+                BoundingBoxX = 50m,
+                BoundingBoxY = 30m,
+                BoundingBoxZ = 20m,
+                IsManifold = true
+            });
+        addResponse.EnsureSuccessStatusCode();
+        var part = await addResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(part);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                ExpectedVersion = before.Version,
+                ClearFinishType = true,
+                ClearColor = true,
+                ClearTolerance = true,
+                ClearRoughnessCode = true,
+                ClearThreadedHoleSpec = true,
+                ClearInsertType = true,
+                ClearInspectionLevel = true,
+                ClearCustomNotes = true
+            });
+
+        updateResponse.EnsureSuccessStatusCode();
+        var updated = await updateResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(updated);
+        Assert.Null(updated.FinishType);
+        Assert.Null(updated.Color);
+        Assert.Null(updated.Tolerance);
+        Assert.Null(updated.RoughnessCode);
+        Assert.Null(updated.ThreadedHoleSpec);
+        Assert.Null(updated.InsertType);
+        Assert.Null(updated.InspectionLevel);
+        Assert.Null(updated.CustomNotes);
+        Assert.Equal("Configured", updated.Status);
+        Assert.Null(updated.AiSuggestedPrice);
+        Assert.Null(updated.ConfirmedUnitPrice);
+        Assert.NotEqual(before.Version, updated.ProjectVersion);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(0m, after.TotalEstimatedPrice);
+    }
+
+    [Fact]
+    public async Task UpdatePart_PreviewDfmAndDrawingOnly_ShouldPreservePricingAndAdvanceVersion()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+        var confirmed = Assert.Single(before.Parts);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                DfmAcknowledged = true,
+                HasDfmWarnings = true,
+                ThumbnailSmallGcsPath = "customers/c1/projects/p1/preview.webp",
+                DrawingFiles =
+                [
+                    new ProjectPartAttachmentDto
+                    {
+                        FileId = Guid.NewGuid(),
+                        FileName = "inspection.pdf",
+                        StoragePath = "customers/c1/projects/p1/drawings/inspection.pdf",
+                        ContentType = "application/pdf"
+                    }
+                ],
+                ExpectedVersion = before.Version
+            });
+
+        updateResponse.EnsureSuccessStatusCode();
+        var updatedPart = await updateResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(updatedPart);
+        Assert.Equal("Confirmed", updatedPart.Status);
+        Assert.Equal(confirmed.AiSuggestedPrice, updatedPart.AiSuggestedPrice);
+        Assert.Equal(confirmed.ConfirmedUnitPrice, updatedPart.ConfirmedUnitPrice);
+        Assert.NotEqual(before.Version, updatedPart.ProjectVersion);
+
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(before.TotalEstimatedPrice, after.TotalEstimatedPrice);
+        Assert.Equal("Confirmed", Assert.Single(after.Parts).Status);
+    }
+
+    [Fact]
+    public async Task UpdatePart_WithStaleVersion_ShouldReturnConflictAndLeavePartUnchanged()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        var before = await GetTestProjectAsync(project.Id);
+
+        var firstResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                DfmAcknowledged = true,
+                ExpectedVersion = before.Version
+            });
+        firstResponse.EnsureSuccessStatusCode();
+        var first = await firstResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(first);
+
+        var staleResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                DfmAcknowledged = false,
+                HasDfmWarnings = true,
+                ExpectedVersion = before.Version
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var after = await GetTestProjectAsync(project.Id);
+        var unchanged = Assert.Single(after.Parts);
+        Assert.True(unchanged.DfmAcknowledged);
+        Assert.False(unchanged.HasDfmWarnings);
+        Assert.Equal(first.ProjectVersion, after.Version);
+    }
+
+    [Fact]
+    public async Task Update_LeadTimeChange_ShouldInvalidatePartPricingAndPreserveGeometry()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+        var beforePart = Assert.Single(before.Parts);
+
+        var response = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = before.Title,
+                Description = before.Description,
+                LeadTimeCode = "EXPRESS",
+                ExpectedVersion = before.Version
+            });
+
+        response.EnsureSuccessStatusCode();
+        var updated = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal("EXPRESS", updated.LeadTimeCode);
+        Assert.Equal(0m, updated.TotalEstimatedPrice);
+        Assert.NotEqual(before.Version, updated.Version);
+        var updatedPart = Assert.Single(updated.Parts);
+        Assert.Equal("Configured", updatedPart.Status);
+        Assert.Null(updatedPart.AiSuggestedPrice);
+        Assert.Null(updatedPart.ConfirmedUnitPrice);
+        Assert.Equal(beforePart.VolumeCm3, updatedPart.VolumeCm3);
+        Assert.Equal(beforePart.BoundingBoxX, updatedPart.BoundingBoxX);
+    }
+
+    [Fact]
+    public async Task Update_WhenQuotationGenerated_ShouldRejectProjectAndPartEdits()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var quoteResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest());
+        quoteResponse.EnsureSuccessStatusCode();
+        var quoted = await quoteResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(quoted);
+
+        var projectResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Forbidden edit",
+                ExpectedVersion = quoted.Version
+            });
+        var partResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}",
+            new UpdateProjectPartRequest
+            {
+                DfmAcknowledged = true,
+                ExpectedVersion = quoted.Version
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, projectResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, partResponse.StatusCode);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(quoted.Title, after.Title);
+        Assert.False(Assert.Single(after.Parts).DfmAcknowledged);
+        Assert.Equal(quoted.Version, after.Version);
+    }
+
+    [Fact]
+    public async Task Update_WithoutExpectedVersion_ShouldRemainBackwardCompatible()
+    {
+        var project = await CreateTestProjectAsync();
+
+        var response = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Legacy client edit",
+                Description = "No expectedVersion field"
+            });
+
+        response.EnsureSuccessStatusCode();
+        var updated = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal("Legacy client edit", updated.Title);
+        Assert.NotEqual(project.Version, updated.Version);
+    }
+
+    [Fact]
+    public async Task RequestReview_WhenQuotationGenerated_ShouldReturnConflictAndPreserveIssuedState()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var quoteResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/generate-quotation",
+            new GenerateQuotationRequest());
+        quoteResponse.EnsureSuccessStatusCode();
+        var quoted = await quoteResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(quoted);
+
+        var reviewResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/request-review",
+            new RequestProjectReviewRequest { Note = "Reopen issued quote" });
+
+        Assert.Equal(HttpStatusCode.Conflict, reviewResponse.StatusCode);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal("QuotationGenerated", after.Status);
+        Assert.Equal(quoted.QuotationId, after.QuotationId);
+        Assert.Equal(quoted.CurrentQuotationVersionId, after.CurrentQuotationVersionId);
+        Assert.Equal(quoted.Version, after.Version);
+    }
+
+    [Fact]
+    public async Task RequestPricing_WhenPartWasConfirmed_ShouldClearConfirmationAndAggregateTotal()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var confirmedProject = await GetTestProjectAsync(project.Id);
+        var confirmedPart = Assert.Single(confirmedProject.Parts);
+        Assert.NotNull(confirmedPart.ConfirmedUnitPrice);
+        Assert.True(confirmedProject.TotalEstimatedPrice > 0m);
+
+        var repriceResponse = await Client.PostAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/price",
+            null);
+
+        repriceResponse.EnsureSuccessStatusCode();
+        var repriced = await repriceResponse.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        Assert.NotNull(repriced);
+        Assert.Equal("Priced", repriced.Status);
+        Assert.Null(repriced.ConfirmedUnitPrice);
+        Assert.Null(repriced.PriceOverrideReason);
+        Assert.NotEqual(confirmedProject.Version, repriced.ProjectVersion);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal(0m, after.TotalEstimatedPrice);
+        Assert.Equal(repriced.ProjectVersion, after.Version);
+    }
+
+    [Fact]
+    public async Task AddAndRemovePart_WithStaleExpectedVersion_ShouldReturnConflictWithoutMutation()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        var current = await GetTestProjectAsync(project.Id);
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Advance aggregate version",
+                ExpectedVersion = current.Version
+            });
+        updateResponse.EnsureSuccessStatusCode();
+
+        var staleAddResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts",
+            new AddProjectPartRequest
+            {
+                FileName = "stale-add.stl",
+                ProcessType = Domain.Enums.ManufacturingProcess.FDM,
+                MaterialId = Guid.NewGuid(),
+                MaterialName = "PLA",
+                Quantity = 1,
+                ExpectedVersion = current.Version
+            });
+        var staleRemoveResponse = await Client.DeleteAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}?expectedVersion={current.Version}");
+
+        Assert.Equal(HttpStatusCode.Conflict, staleAddResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, staleRemoveResponse.StatusCode);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.Equal("Advance aggregate version", after.Title);
+        Assert.Equal(part.Id, Assert.Single(after.Parts).Id);
+    }
+
+    [Fact]
+    public async Task ArchivedDraftProject_UpdateAddAndRemoveWrites_ShouldReturnConflict()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        var archiveResponse = await Client.PostAsync($"/project/v1/projects/{project.Id}/archive", null);
+        archiveResponse.EnsureSuccessStatusCode();
+        var archived = await archiveResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(archived);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}",
+            new UpdateProjectRequest
+            {
+                Title = "Forbidden archived update",
+                ExpectedVersion = archived.Version
+            });
+        var addResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts",
+            new AddProjectPartRequest
+            {
+                FileName = "archived-add.stl",
+                ProcessType = Domain.Enums.ManufacturingProcess.FDM,
+                MaterialId = Guid.NewGuid(),
+                MaterialName = "PLA",
+                Quantity = 1,
+                ExpectedVersion = archived.Version
+            });
+        var removeResponse = await Client.DeleteAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}?expectedVersion={archived.Version}");
+
+        Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, addResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, removeResponse.StatusCode);
+        var after = await GetTestProjectAsync(project.Id);
+        Assert.True(after.IsArchived);
+        Assert.Equal(project.Title, after.Title);
+        Assert.Equal(part.Id, Assert.Single(after.Parts).Id);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WithCurrentVersion_ShouldPersistAtomicallyWithoutInvalidatingPricing()
+    {
+        var project = await CreateTestProjectAsync();
+        var part = await AddTestPartAsync(project.Id);
+        await Client.PostAsync($"/project/v1/projects/{project.Id}/parts/{part.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/parts/{part.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var before = await GetTestProjectAsync(project.Id);
+        var beforePart = Assert.Single(before.Parts);
+        var billingAddressId = Guid.NewGuid();
+        var shippingAddressId = Guid.NewGuid();
+
+        var response = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = before.Version,
+                selectedBillingAddressId = billingAddressId,
+                selectedShippingAddressId = shippingAddressId
+            });
+
+        response.EnsureSuccessStatusCode();
+        var updated = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal(billingAddressId, updated.SelectedBillingAddressId);
+        Assert.Equal(shippingAddressId, updated.SelectedShippingAddressId);
+        Assert.NotEqual(before.Version, updated.Version);
+        Assert.Equal(before.TotalEstimatedPrice, updated.TotalEstimatedPrice);
+        var updatedPart = Assert.Single(updated.Parts);
+        Assert.Equal(beforePart.Status, updatedPart.Status);
+        Assert.Equal(beforePart.AiSuggestedPrice, updatedPart.AiSuggestedPrice);
+        Assert.Equal(beforePart.ConfirmedUnitPrice, updatedPart.ConfirmedUnitPrice);
+
+        var fetched = await GetTestProjectAsync(project.Id);
+        Assert.Equal(billingAddressId, fetched.SelectedBillingAddressId);
+        Assert.Equal(shippingAddressId, fetched.SelectedShippingAddressId);
+        Assert.Equal(updated.Version, fetched.Version);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WithStaleVersion_ShouldReturnConflictWithoutPartialMutation()
+    {
+        var project = await CreateTestProjectAsync();
+        var firstBillingAddressId = Guid.NewGuid();
+        var firstShippingAddressId = Guid.NewGuid();
+        var firstResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = firstBillingAddressId,
+                selectedShippingAddressId = firstShippingAddressId
+            });
+        firstResponse.EnsureSuccessStatusCode();
+        var first = await firstResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(first);
+
+        var staleResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+        var fetched = await GetTestProjectAsync(project.Id);
+        Assert.Equal(firstBillingAddressId, fetched.SelectedBillingAddressId);
+        Assert.Equal(firstShippingAddressId, fetched.SelectedShippingAddressId);
+        Assert.Equal(first.Version, fetched.Version);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WithCurrentVersion_ShouldAllowClearingBothSelections()
+    {
+        var project = await CreateTestProjectAsync();
+        var setResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+        setResponse.EnsureSuccessStatusCode();
+        var selected = await setResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(selected);
+
+        var clearResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = selected.Version,
+                selectedBillingAddressId = (Guid?)null,
+                selectedShippingAddressId = (Guid?)null
+            });
+
+        clearResponse.EnsureSuccessStatusCode();
+        var cleared = await clearResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(cleared);
+        Assert.Null(cleared.SelectedBillingAddressId);
+        Assert.Null(cleared.SelectedShippingAddressId);
+        Assert.NotEqual(selected.Version, cleared.Version);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WithMissingOrInvalidConcurrencyAndAddressValues_ShouldReturnBadRequest()
+    {
+        var project = await CreateTestProjectAsync();
+
+        var missingVersion = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+        var zeroVersion = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = 0u,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+        var emptyBilling = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = Guid.Empty,
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+        var emptyShipping = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.Empty
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, missingVersion.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, zeroVersion.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emptyBilling.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emptyShipping.StatusCode);
+        var fetched = await GetTestProjectAsync(project.Id);
+        Assert.Null(fetched.SelectedBillingAddressId);
+        Assert.Null(fetched.SelectedShippingAddressId);
+        Assert.Equal(project.Version, fetched.Version);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WhenArchivedOrQuotationGenerated_ShouldReturnConflictWithoutMutation()
+    {
+        var archivedProject = await CreateTestProjectAsync();
+        var archiveResponse = await Client.PostAsync($"/project/v1/projects/{archivedProject.Id}/archive", null);
+        archiveResponse.EnsureSuccessStatusCode();
+        var archived = await archiveResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(archived);
+
+        var archivedResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{archivedProject.Id}/address-selection",
+            new
+            {
+                expectedVersion = archived.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+
+        var quotedProject = await CreateTestProjectAsync();
+        var quotedPart = await AddTestPartAsync(quotedProject.Id);
+        await Client.PostAsync($"/project/v1/projects/{quotedProject.Id}/parts/{quotedPart.Id}/price", null);
+        await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{quotedProject.Id}/parts/{quotedPart.Id}/confirm-price",
+            new ConfirmPartPriceRequest());
+        var quoteResponse = await Client.PostAsJsonAsync(
+            $"/project/v1/projects/{quotedProject.Id}/generate-quotation",
+            new GenerateQuotationRequest());
+        quoteResponse.EnsureSuccessStatusCode();
+        var quoted = await quoteResponse.Content.ReadFromJsonAsync<ProjectDetailResponse>();
+        Assert.NotNull(quoted);
+        var quotedResponse = await Client.PutAsJsonAsync(
+            $"/project/v1/projects/{quotedProject.Id}/address-selection",
+            new
+            {
+                expectedVersion = quoted.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, archivedResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, quotedResponse.StatusCode);
+        var archivedAfter = await GetTestProjectAsync(archivedProject.Id);
+        var quotedAfter = await GetTestProjectAsync(quotedProject.Id);
+        Assert.Null(archivedAfter.SelectedBillingAddressId);
+        Assert.Null(quotedAfter.SelectedBillingAddressId);
+        Assert.Equal(archived.Version, archivedAfter.Version);
+        Assert.Equal(quoted.Version, quotedAfter.Version);
+    }
+
+    [Fact]
+    public async Task UpdateAddressSelection_WithDifferentCustomerScope_ShouldReturnForbiddenWithoutMutation()
+    {
+        var project = await CreateTestProjectAsync(Guid.NewGuid());
+        var scopedClient = Fixture.CreateClientWithPermissionsAndClaims(
+            new Dictionary<string, string> { ["customer_id"] = Guid.NewGuid().ToString() },
+            "project.projects.update");
+
+        var response = await scopedClient.PutAsJsonAsync(
+            $"/project/v1/projects/{project.Id}/address-selection",
+            new
+            {
+                expectedVersion = project.Version,
+                selectedBillingAddressId = Guid.NewGuid(),
+                selectedShippingAddressId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var fetched = await GetTestProjectAsync(project.Id);
+        Assert.Null(fetched.SelectedBillingAddressId);
+        Assert.Null(fetched.SelectedShippingAddressId);
+        Assert.Equal(project.Version, fetched.Version);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<ProjectDetailResponse> CreateTestProjectAsync(Guid? customerId = null)
@@ -675,6 +1385,14 @@ public class ProjectsControllerTests : BaseIntegrationTest
         var response = await Client.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts", request);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ProjectPartResponse>();
+        return result!;
+    }
+
+    private async Task<ProjectDetailResponse> GetTestProjectAsync(Guid projectId)
+    {
+        var response = await Client.GetAsync($"/project/v1/projects/{projectId}");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<ProjectDetailResponse>();
         return result!;
     }
 

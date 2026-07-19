@@ -107,7 +107,7 @@ public class ProjectManagementService : IProjectService
         await PublishSearchDocumentsSafeAsync(project, DateTimeOffset.UtcNow, ct);
 
         _logger.LogInformation("Project {ProjectNumber} created by {PrincipalId}", projectNumber, principalId);
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -116,11 +116,10 @@ public class ProjectManagementService : IProjectService
         var project = await _db.Projects
             .Include(p => p.Parts)
             .Include(p => p.Notes)
-            .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == projectId, ct);
 
-        return project?.ToDetailResponse();
+        return project?.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -188,17 +187,54 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        EnsureProjectAllowsCommercialChange(project);
+        ApplyExpectedVersion(project, request.ExpectedVersion);
 
         project.Title = request.Title;
         project.Description = request.Description;
+        if (request.LeadTimeCode is not null)
+        {
+            var leadTimeCode = request.LeadTimeCode.Trim().ToUpperInvariant();
+            if (leadTimeCode.Length == 0)
+                throw new InvalidOperationException("Lead-time code cannot be empty.");
+
+            if (!string.Equals(project.LeadTimeCode, leadTimeCode, StringComparison.Ordinal))
+            {
+                project.LeadTimeCode = leadTimeCode;
+                InvalidatePartPricing(project.Parts);
+                project.TotalEstimatedPrice = CalculateConfirmedTotal(project.Parts);
+            }
+        }
         project.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
+    }
+
+    /// <inheritdoc />
+    public async Task<ProjectDetailResponse> UpdateAddressSelectionAsync(
+        Guid projectId,
+        UpdateProjectAddressSelectionRequest request,
+        string principalId,
+        CancellationToken ct = default)
+    {
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
+        EnsureProjectAllowsCommercialChange(project);
+        ApplyExpectedVersion(project, request.ExpectedVersion);
+
+        project.SelectedBillingAddressId = request.SelectedBillingAddressId;
+        project.SelectedShippingAddressId = request.SelectedShippingAddressId;
+        project.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        await InvalidateCacheAsync(projectId);
+        await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
+
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -217,7 +253,7 @@ public class ProjectManagementService : IProjectService
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -236,7 +272,7 @@ public class ProjectManagementService : IProjectService
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -284,6 +320,7 @@ public class ProjectManagementService : IProjectService
     {
         var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
         EnsureProjectAllowsCommercialChange(project);
+        ApplyExpectedVersion(project, request.ExpectedVersion);
 
         var nextPartNumber = project.Parts.Any()
             ? project.Parts.Max(p => p.PartNumber) + 1
@@ -361,7 +398,7 @@ public class ProjectManagementService : IProjectService
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return part.ToResponse();
+        return part.ToResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -372,32 +409,45 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
         EnsureProjectAllowsCommercialChange(project);
-        var part = await GetPartOrThrowAsync(projectId, partId, ct);
+        ApplyExpectedVersion(project, request.ExpectedVersion);
+        var part = project.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (part is null)
+            throw new KeyNotFoundException($"Part {partId} not found in project {projectId}.");
+        if (part.Status == PartStatus.Removed)
+            throw new InvalidOperationException($"Part {partId} has been removed from the project.");
         var now = DateTime.UtcNow;
+        var pricingRelevantChange = IsPricingRelevantChange(part, request);
 
         if (request.ProcessType.HasValue) part.ProcessType = request.ProcessType.Value;
         if (request.MaterialId.HasValue) part.MaterialId = request.MaterialId.Value;
         if (request.MaterialName is not null) part.MaterialName = request.MaterialName;
         if (request.MaterialCode is not null) part.MaterialCode = request.MaterialCode;
         if (request.Quantity.HasValue) part.Quantity = request.Quantity.Value;
-        if (request.FinishType is not null) part.FinishType = request.FinishType;
-        if (request.Color is not null) part.Color = request.Color;
-        if (request.Tolerance is not null) part.Tolerance = request.Tolerance;
-        if (request.RoughnessCode is not null) part.RoughnessCode = request.RoughnessCode;
+        if (request.ClearFinishType) part.FinishType = null;
+        else if (request.FinishType is not null) part.FinishType = request.FinishType;
+        if (request.ClearColor) part.Color = null;
+        else if (request.Color is not null) part.Color = request.Color;
+        if (request.ClearTolerance) part.Tolerance = null;
+        else if (request.Tolerance is not null) part.Tolerance = request.Tolerance;
+        if (request.ClearRoughnessCode) part.RoughnessCode = null;
+        else if (request.RoughnessCode is not null) part.RoughnessCode = request.RoughnessCode;
         if (request.MarkingType is not null) part.MarkingType = request.MarkingType;
         if (request.MarkingText is not null) part.MarkingText = request.MarkingText;
         if (request.DfmAcknowledged.HasValue) part.DfmAcknowledged = request.DfmAcknowledged.Value;
         if (request.HasDfmWarnings.HasValue) part.HasDfmWarnings = request.HasDfmWarnings.Value;
         if (request.HasThreadedHoles.HasValue) part.HasThreadedHoles = request.HasThreadedHoles.Value;
-        if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
+        if (request.ClearThreadedHoleSpec) part.ThreadedHoleSpec = null;
+        else if (request.ThreadedHoleSpec is not null) part.ThreadedHoleSpec = request.ThreadedHoleSpec;
         if (request.ThreadedHoleCount.HasValue) part.ThreadedHoleCount = request.ThreadedHoleCount.Value;
         if (request.HasInserts.HasValue) part.HasInserts = request.HasInserts.Value;
-        if (request.InsertType is not null) part.InsertType = request.InsertType;
+        if (request.ClearInsertType) part.InsertType = null;
+        else if (request.InsertType is not null) part.InsertType = request.InsertType;
         if (request.InsertCount.HasValue) part.InsertCount = request.InsertCount.Value;
         if (request.BagAndTag.HasValue) part.BagAndTag = request.BagAndTag.Value;
-        if (request.InspectionLevel is not null) part.InspectionLevel = request.InspectionLevel;
+        if (request.ClearInspectionLevel) part.InspectionLevel = null;
+        else if (request.InspectionLevel is not null) part.InspectionLevel = request.InspectionLevel;
         if (request.Certificates is not null) part.Certificates = [.. request.Certificates];
         if (request.DrawingFiles is not null) part.DrawingFiles = request.DrawingFiles.Select(attachment => attachment.ToAttachment()).ToList();
         if (request.SupplementaryFiles is not null) part.SupplementaryFiles = request.SupplementaryFiles.Select(attachment => attachment.ToAttachment()).ToList();
@@ -410,40 +460,55 @@ public class ProjectManagementService : IProjectService
         if (request.BodiesJson is not null) part.BodiesJson = request.BodiesJson;
         if (request.SelectedBodyIndex.HasValue) part.SelectedBodyIndex = request.SelectedBodyIndex.Value;
         if (request.ThreadsInserts is not null) part.ThreadsInserts = request.ThreadsInserts;
-        if (request.CustomNotes is not null) part.CustomNotes = request.CustomNotes;
+        if (request.ClearCustomNotes) part.CustomNotes = null;
+        else if (request.CustomNotes is not null) part.CustomNotes = request.CustomNotes;
 
         // If configuration is now complete, advance to Configured
         if (part.ProcessType != default && part.MaterialId.HasValue && part.Status == PartStatus.Uploaded)
             part.Status = PartStatus.Configured;
 
-        // If configuration changed after pricing, reset to Configured (price may be stale)
-        if (part.Status == PartStatus.Priced || part.Status == PartStatus.Confirmed || part.Status == PartStatus.Quoted)
+        // Pricing-relevant configuration changes invalidate the effective price and quote state.
+        // Preview, DFM, and drawing-only mutations intentionally preserve commercial state.
+        if (pricingRelevantChange &&
+            (part.Status == PartStatus.Priced || part.Status == PartStatus.Confirmed || part.Status == PartStatus.Quoted))
         {
             part.AiSuggestedPrice = null;
             part.ConfirmedUnitPrice = null;
+            part.PriceOverrideReason = null;
             part.PricingConfidence = null;
+            part.PricingStrategy = null;
             part.Status = PartStatus.Configured;
-            if (project.Status == ProjectStatus.QuotationGenerated || project.Status == ProjectStatus.QuotationSent)
-            {
-                project.Status = ProjectStatus.Configuring;
-                project.UpdatedAt = now;
-            }
         }
 
         part.UpdatedAt = now;
+        project.UpdatedAt = now;
+        if (pricingRelevantChange)
+        {
+            project.TotalEstimatedPrice = CalculateConfirmedTotal(project.Parts);
+        }
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return part.ToResponse();
+        return part.ToResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
-    public async Task RemovePartAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default)
+    public async Task RemovePartAsync(
+        Guid projectId,
+        Guid partId,
+        uint? expectedVersion,
+        string principalId,
+        CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
         EnsureProjectAllowsCommercialChange(project);
-        var part = await GetPartOrThrowAsync(projectId, partId, ct);
+        ApplyExpectedVersion(project, expectedVersion);
+        var part = project.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (part is null)
+            throw new KeyNotFoundException($"Part {partId} not found in project {projectId}.");
+        if (part.Status == PartStatus.Removed)
+            throw new InvalidOperationException($"Part {partId} has been removed from the project.");
 
         if (part.Status >= PartStatus.Ordered)
             throw new InvalidOperationException($"Part '{part.FileName}' cannot be removed after an order has been placed.");
@@ -451,6 +516,8 @@ public class ProjectManagementService : IProjectService
         part.Status = PartStatus.Removed;
         var occurredAtUtc = DateTimeOffset.UtcNow;
         part.UpdatedAt = occurredAtUtc.UtcDateTime;
+        project.UpdatedAt = occurredAtUtc.UtcDateTime;
+        project.TotalEstimatedPrice = CalculateConfirmedTotal(project.Parts);
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
@@ -468,9 +535,13 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var part = await GetPartOrThrowAsync(projectId, partId, ct);
-        var project = await GetProjectOrThrowAsync(projectId, ct);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
         EnsureProjectAllowsCommercialChange(project);
+        var part = project.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (part is null)
+            throw new KeyNotFoundException($"Part {partId} not found in project {projectId}.");
+        if (part.Status == PartStatus.Removed)
+            throw new InvalidOperationException($"Part {partId} has been removed from the project.");
 
         if (part.ProcessType == default)
             throw new InvalidOperationException("Part must have a manufacturing process selected before requesting pricing.");
@@ -500,10 +571,14 @@ public class ProjectManagementService : IProjectService
         var result = await _pricingClient.CalculateAsync(pricingRequest, ct);
 
         part.AiSuggestedPrice = result.TotalUnitPrice;
+        part.ConfirmedUnitPrice = null;
+        part.PriceOverrideReason = null;
         part.PricingConfidence = result.ConfidenceLevel;
         part.PricingStrategy = result.PricingStrategyValue;
         part.Status = PartStatus.Priced;
         part.UpdatedAt = DateTime.UtcNow;
+        project.UpdatedAt = part.UpdatedAt;
+        project.TotalEstimatedPrice = CalculateConfirmedTotal(project.Parts);
 
         await _db.SaveChangesAsync(ct);
         await InvalidateCacheAsync(projectId);
@@ -512,7 +587,7 @@ public class ProjectManagementService : IProjectService
         _logger.LogInformation("Pricing for part {PartId} in project {ProjectId}: {Price} THB (confidence: {Confidence:P0})",
             partId, projectId, result.TotalUnitPrice, result.ConfidenceLevel);
 
-        return part.ToResponse();
+        return part.ToResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -523,9 +598,13 @@ public class ProjectManagementService : IProjectService
         string principalId,
         CancellationToken ct = default)
     {
-        var project = await GetProjectOrThrowAsync(projectId, ct);
+        var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true);
         EnsureProjectAllowsCommercialChange(project);
-        var part = await GetPartOrThrowAsync(projectId, partId, ct);
+        var part = project.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (part is null)
+            throw new KeyNotFoundException($"Part {partId} not found in project {projectId}.");
+        if (part.Status == PartStatus.Removed)
+            throw new InvalidOperationException($"Part {partId} has been removed from the project.");
 
         if (part.AiSuggestedPrice is null && request.ConfirmedUnitPrice is null)
             throw new InvalidOperationException("Part must have an AI-suggested price before confirming. Request pricing first.");
@@ -534,14 +613,14 @@ public class ProjectManagementService : IProjectService
         part.PriceOverrideReason = request.PriceOverrideReason;
         part.Status = PartStatus.Confirmed;
         part.UpdatedAt = DateTime.UtcNow;
+        project.UpdatedAt = part.UpdatedAt;
+        project.TotalEstimatedPrice = CalculateConfirmedTotal(project.Parts);
 
-        // Recompute project total
         await _db.SaveChangesAsync(ct);
-        await RecalculateProjectTotalAsync(projectId, ct);
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return part.ToResponse();
+        return part.ToResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -552,7 +631,7 @@ public class ProjectManagementService : IProjectService
         CancellationToken ct = default)
     {
         var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
-        EnsureProjectAllowsCommercialChange(project);
+        EnsureProjectAllowsQuotationGeneration(project);
 
         var activeParts = project.Parts.Where(p => p.Status != PartStatus.Removed).ToList();
         var unconfirmed = activeParts.Where(p => p.Status < PartStatus.Confirmed).ToList();
@@ -661,7 +740,7 @@ public class ProjectManagementService : IProjectService
         _logger.LogInformation("Quotation {QuotationNumber} generated for project {ProjectNumber}",
             created.QuotationNumber, project.ProjectNumber);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -681,7 +760,7 @@ public class ProjectManagementService : IProjectService
         await InvalidateCacheAsync(projectId);
         await PublishSearchDocumentsSafeAsync(projectId, DateTimeOffset.UtcNow, ct);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -757,7 +836,7 @@ public class ProjectManagementService : IProjectService
         _logger.LogInformation("Quotation for project {ProjectNumber} accepted by {PrincipalId}",
             project.ProjectNumber, principalId);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -769,10 +848,7 @@ public class ProjectManagementService : IProjectService
         CancellationToken ct = default)
     {
         var project = await GetProjectOrThrowAsync(projectId, ct, includeParts: true, includeNotes: true);
-        if (project.Status >= ProjectStatus.QuotationAccepted)
-        {
-            throw new InvalidOperationException($"Project {project.ProjectNumber} cannot request customer review in {project.Status} status.");
-        }
+        EnsureProjectAllowsCommercialChange(project);
 
         var note = new ProjectNote
         {
@@ -797,7 +873,7 @@ public class ProjectManagementService : IProjectService
         _logger.LogInformation("Customer review requested for project {ProjectNumber} by {PrincipalId}",
             project.ProjectNumber, principalId);
 
-        return project.ToDetailResponse();
+        return project.ToDetailResponse(GetProjectVersion(project));
     }
 
     /// <inheritdoc />
@@ -941,7 +1017,87 @@ public class ProjectManagementService : IProjectService
 
     // ─── Private Helpers ──────────────────────────────────────────────────────────
 
+    private uint GetProjectVersion(Project project) =>
+        _db.Entry(project).Property<uint>("xmin").CurrentValue;
+
+    private void ApplyExpectedVersion(Project project, uint? expectedVersion)
+    {
+        if (expectedVersion.HasValue)
+        {
+            _db.Entry(project).Property<uint>("xmin").OriginalValue = expectedVersion.Value;
+        }
+    }
+
+    private static decimal CalculateConfirmedTotal(IEnumerable<ProjectPart> parts) =>
+        parts
+            .Where(part => part.Status >= PartStatus.Confirmed && part.Status != PartStatus.Removed)
+            .Sum(part => (part.ConfirmedUnitPrice ?? part.AiSuggestedPrice ?? 0m) * part.Quantity);
+
+    private static void InvalidatePartPricing(IEnumerable<ProjectPart> parts)
+    {
+        foreach (var part in parts.Where(part =>
+                     part.Status is PartStatus.Priced or PartStatus.Confirmed or PartStatus.Quoted))
+        {
+            part.AiSuggestedPrice = null;
+            part.ConfirmedUnitPrice = null;
+            part.PriceOverrideReason = null;
+            part.PricingConfidence = null;
+            part.PricingStrategy = null;
+            part.Status = PartStatus.Configured;
+            part.UpdatedAt = DateTime.UtcNow;
+        }
+    }
+
+    private static bool IsPricingRelevantChange(ProjectPart part, UpdateProjectPartRequest request) =>
+        (request.ProcessType.HasValue && request.ProcessType.Value != part.ProcessType) ||
+        (request.MaterialId.HasValue && request.MaterialId.Value != part.MaterialId) ||
+        (request.MaterialName is not null && !string.Equals(request.MaterialName, part.MaterialName, StringComparison.Ordinal)) ||
+        (request.MaterialCode is not null && !string.Equals(request.MaterialCode, part.MaterialCode, StringComparison.Ordinal)) ||
+        (request.Quantity.HasValue && request.Quantity.Value != part.Quantity) ||
+        (request.ClearFinishType && part.FinishType is not null) ||
+        (!request.ClearFinishType && request.FinishType is not null && !string.Equals(request.FinishType, part.FinishType, StringComparison.Ordinal)) ||
+        (request.ClearColor && part.Color is not null) ||
+        (!request.ClearColor && request.Color is not null && !string.Equals(request.Color, part.Color, StringComparison.Ordinal)) ||
+        (request.ClearTolerance && part.Tolerance is not null) ||
+        (!request.ClearTolerance && request.Tolerance is not null && !string.Equals(request.Tolerance, part.Tolerance, StringComparison.Ordinal)) ||
+        (request.ClearRoughnessCode && part.RoughnessCode is not null) ||
+        (!request.ClearRoughnessCode && request.RoughnessCode is not null && !string.Equals(request.RoughnessCode, part.RoughnessCode, StringComparison.Ordinal)) ||
+        (request.MarkingType is not null && !string.Equals(request.MarkingType, part.MarkingType, StringComparison.Ordinal)) ||
+        (request.MarkingText is not null && !string.Equals(request.MarkingText, part.MarkingText, StringComparison.Ordinal)) ||
+        (request.HasThreadedHoles.HasValue && request.HasThreadedHoles.Value != part.HasThreadedHoles) ||
+        (request.ClearThreadedHoleSpec && part.ThreadedHoleSpec is not null) ||
+        (!request.ClearThreadedHoleSpec && request.ThreadedHoleSpec is not null && !string.Equals(request.ThreadedHoleSpec, part.ThreadedHoleSpec, StringComparison.Ordinal)) ||
+        (request.ThreadedHoleCount.HasValue && request.ThreadedHoleCount.Value != part.ThreadedHoleCount) ||
+        (request.HasInserts.HasValue && request.HasInserts.Value != part.HasInserts) ||
+        (request.ClearInsertType && part.InsertType is not null) ||
+        (!request.ClearInsertType && request.InsertType is not null && !string.Equals(request.InsertType, part.InsertType, StringComparison.Ordinal)) ||
+        (request.InsertCount.HasValue && request.InsertCount.Value != part.InsertCount) ||
+        (request.BagAndTag.HasValue && request.BagAndTag.Value != part.BagAndTag) ||
+        (request.ClearInspectionLevel && part.InspectionLevel is not null) ||
+        (!request.ClearInspectionLevel && request.InspectionLevel is not null && !string.Equals(request.InspectionLevel, part.InspectionLevel, StringComparison.Ordinal)) ||
+        (request.Certificates is not null && !request.Certificates.SequenceEqual(part.Certificates, StringComparer.Ordinal)) ||
+        (request.ProcessConfig is not null && !DictionaryEquals(request.ProcessConfig, part.ProcessConfig)) ||
+        (request.SelectedBodyIndex.HasValue && request.SelectedBodyIndex.Value != part.SelectedBodyIndex) ||
+        (request.ThreadsInserts is not null && !string.Equals(request.ThreadsInserts, part.ThreadsInserts, StringComparison.Ordinal));
+
+    private static bool DictionaryEquals(
+        IReadOnlyDictionary<string, string> requested,
+        IReadOnlyDictionary<string, string> current) =>
+        requested.Count == current.Count &&
+        requested.All(pair => current.TryGetValue(pair.Key, out var value) &&
+                              string.Equals(pair.Value, value, StringComparison.Ordinal));
+
     private static void EnsureProjectAllowsCommercialChange(Project project)
+    {
+        if (project.IsArchived ||
+            project.Status is not (ProjectStatus.Draft or ProjectStatus.Configuring or ProjectStatus.CustomerReview))
+        {
+            throw new InvalidOperationException(
+                $"Project {project.ProjectNumber} cannot be edited in its current archived or {project.Status} state. Duplicate or restore the project before making changes.");
+        }
+    }
+
+    private static void EnsureProjectAllowsQuotationGeneration(Project project)
     {
         if (project.Status >= ProjectStatus.QuotationAccepted)
         {
@@ -1114,19 +1270,6 @@ public class ProjectManagementService : IProjectService
         if (part.Status == PartStatus.Removed)
             throw new InvalidOperationException($"Part {partId} has been removed from the project.");
         return part;
-    }
-
-    private async Task RecalculateProjectTotalAsync(Guid projectId, CancellationToken ct)
-    {
-        var confirmedTotal = await _db.ProjectParts
-            .Where(p => p.ProjectId == projectId && p.Status >= PartStatus.Confirmed && p.Status != PartStatus.Removed)
-            .SumAsync(p => (p.ConfirmedUnitPrice ?? p.AiSuggestedPrice ?? 0m) * p.Quantity, ct);
-
-        await _db.Projects
-            .Where(p => p.Id == projectId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(p => p.TotalEstimatedPrice, confirmedTotal)
-                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow), ct);
     }
 
     private async Task InvalidateCacheAsync(Guid projectId)

@@ -19,6 +19,9 @@ public interface IProjectService
     /// <summary>Updates project metadata (title, description).</summary>
     Task<ProjectDetailResponse> UpdateAsync(Guid projectId, UpdateProjectRequest request, string principalId, CancellationToken ct = default);
 
+    /// <summary>Atomically updates caller-validated billing and shipping address references for an editable project.</summary>
+    Task<ProjectDetailResponse> UpdateAddressSelectionAsync(Guid projectId, UpdateProjectAddressSelectionRequest request, string principalId, CancellationToken ct = default);
+
     /// <summary>Sets whether a project is pinned for quick customer access.</summary>
     Task<ProjectDetailResponse> SetPinnedAsync(Guid projectId, bool isPinned, string principalId, CancellationToken ct = default);
 
@@ -35,7 +38,7 @@ public interface IProjectService
     Task<ProjectPartResponse> UpdatePartAsync(Guid projectId, Guid partId, UpdateProjectPartRequest request, string principalId, CancellationToken ct = default);
 
     /// <summary>Removes a part from a project. Only valid before quotation is generated.</summary>
-    Task RemovePartAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);
+    Task RemovePartAsync(Guid projectId, Guid partId, uint? expectedVersion, string principalId, CancellationToken ct = default);
 
     /// <summary>Requests AI pricing for a specific part. Calls PricingService synchronously.</summary>
     Task<ProjectPartResponse> RequestPricingAsync(Guid projectId, Guid partId, string principalId, CancellationToken ct = default);

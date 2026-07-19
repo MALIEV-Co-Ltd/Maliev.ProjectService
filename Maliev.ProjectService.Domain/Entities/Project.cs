@@ -59,6 +59,15 @@ public class Project
     /// <summary>Currency code (ISO 4217). Defaults to THB.</summary>
     public string Currency { get; set; } = "THB";
 
+    /// <summary>Requested delivery lead-time tier. Defaults to STANDARD.</summary>
+    public string LeadTimeCode { get; set; } = "STANDARD";
+
+    /// <summary>CustomerService address selected for billing while this project remains editable.</summary>
+    public Guid? SelectedBillingAddressId { get; set; }
+
+    /// <summary>CustomerService address selected for shipping while this project remains editable.</summary>
+    public Guid? SelectedShippingAddressId { get; set; }
+
     /// <summary>Date until which the quotation is valid. Set when quotation is generated.</summary>
     public DateTime? ValidUntil { get; set; }
 

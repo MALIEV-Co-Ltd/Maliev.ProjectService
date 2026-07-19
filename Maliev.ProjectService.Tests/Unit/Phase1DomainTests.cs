@@ -158,6 +158,8 @@ public class Phase1DomainTests
     {
         var id = Guid.NewGuid();
         var customerId = Guid.NewGuid();
+        var billingAddressId = Guid.NewGuid();
+        var shippingAddressId = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var project = new Project
         {
@@ -170,6 +172,8 @@ public class Phase1DomainTests
             Status = ProjectStatus.Configuring,
             Currency = "THB",
             TotalEstimatedPrice = 9999.50m,
+            SelectedBillingAddressId = billingAddressId,
+            SelectedShippingAddressId = shippingAddressId,
             CreatedBy = "user-123",
             CreatedByName = "John Doe",
             CreatedAt = now,
@@ -178,7 +182,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal(id, dto.Id);
         Assert.Equal("PRJ-2026-0001", dto.ProjectNumber);
@@ -188,6 +192,8 @@ public class Phase1DomainTests
         Assert.Equal("Configuring", dto.Status);
         Assert.Equal("THB", dto.Currency);
         Assert.Equal(9999.50m, dto.TotalEstimatedPrice);
+        Assert.Equal(billingAddressId, dto.SelectedBillingAddressId);
+        Assert.Equal(shippingAddressId, dto.SelectedShippingAddressId);
         Assert.Empty(dto.Parts);
         Assert.Empty(dto.Notes);
     }
@@ -207,7 +213,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal(2, dto.Parts.Count);
         Assert.DoesNotContain(dto.Parts, p => p.FileName == "b.stl");
@@ -228,7 +234,7 @@ public class Phase1DomainTests
             Notes = []
         };
 
-        var dto = project.ToDetailResponse();
+        var dto = project.ToDetailResponse(42);
 
         Assert.Equal("a.stl", dto.Parts[0].FileName);
         Assert.Equal("b.stl", dto.Parts[1].FileName);
@@ -356,7 +362,7 @@ public class Phase1DomainTests
             UpdatedAt = now
         };
 
-        var dto = part.ToResponse();
+        var dto = part.ToResponse(42);
 
         Assert.Equal(id, dto.Id);
         Assert.Equal(projectId, dto.ProjectId);
