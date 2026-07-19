@@ -11,10 +11,11 @@ namespace Maliev.ProjectService.Application.DTOs;
 public static class MappingExtensions
 {
     /// <summary>Maps a <see cref="Project"/> entity to a <see cref="ProjectDetailResponse"/>.</summary>
-    public static ProjectDetailResponse ToDetailResponse(this Project project)
+    public static ProjectDetailResponse ToDetailResponse(this Project project, uint version)
     {
         return new ProjectDetailResponse
         {
+            Version = version,
             Id = project.Id,
             ProjectNumber = project.ProjectNumber,
             CustomerId = project.CustomerId,
@@ -22,10 +23,19 @@ public static class MappingExtensions
             Title = project.Title,
             Description = project.Description,
             Status = project.Status.ToString(),
+            IsPinned = project.IsPinned,
+            IsArchived = project.IsArchived,
             QuotationId = project.QuotationId,
             QuotationNumber = project.QuotationNumber,
+            CurrentQuotationVersionId = project.CurrentQuotationVersionId,
+            CurrentQuotationVersionNumber = project.CurrentQuotationVersionNumber,
+            SourceProjectId = project.SourceProjectId,
+            SourceProjectNumber = project.SourceProjectNumber,
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
+            LeadTimeCode = project.LeadTimeCode,
+            SelectedBillingAddressId = project.SelectedBillingAddressId,
+            SelectedShippingAddressId = project.SelectedShippingAddressId,
             ValidUntil = project.ValidUntil,
             CreatedBy = project.CreatedBy,
             CreatedByName = project.CreatedByName,
@@ -34,7 +44,7 @@ public static class MappingExtensions
             Parts = project.Parts
                 .Where(p => p.Status != PartStatus.Removed)
                 .OrderBy(p => p.PartNumber)
-                .Select(p => p.ToResponse())
+                .Select(p => p.ToResponse(version))
                 .ToList(),
             Notes = project.Notes
                 .OrderByDescending(n => n.CreatedAt)
@@ -55,21 +65,50 @@ public static class MappingExtensions
             CustomerName = project.CustomerName,
             Title = project.Title,
             Status = project.Status.ToString(),
+            IsPinned = project.IsPinned,
+            IsArchived = project.IsArchived,
             PartsCount = activeParts.Count,
             ConfirmedPartsCount = activeParts.Count(p => p.Status >= PartStatus.Confirmed),
             TotalEstimatedPrice = project.TotalEstimatedPrice,
             Currency = project.Currency,
             QuotationNumber = project.QuotationNumber,
+            CurrentQuotationVersionId = project.CurrentQuotationVersionId,
+            CurrentQuotationVersionNumber = project.CurrentQuotationVersionNumber,
+            SourceProjectId = project.SourceProjectId,
+            SourceProjectNumber = project.SourceProjectNumber,
             CreatedAt = project.CreatedAt,
-            CreatedByName = project.CreatedByName
+            CreatedByName = project.CreatedByName,
+            PartPreviews = activeParts
+                .OrderBy(part => part.PartNumber)
+                .Take(4)
+                .Select(ToPreviewResponse)
+                .ToList()
+        };
+    }
+
+    private static ProjectPartPreviewResponse ToPreviewResponse(ProjectPart part)
+    {
+        return new ProjectPartPreviewResponse
+        {
+            Id = part.Id,
+            PartNumber = part.PartNumber,
+            FileName = part.FileName,
+            FileReference = part.FileReference,
+            ThumbnailUrl = part.ThumbnailUrl,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            ProcessType = part.ProcessType.ToString(),
+            MaterialName = part.MaterialName,
+            Quantity = part.Quantity
         };
     }
 
     /// <summary>Maps a <see cref="ProjectPart"/> entity to a <see cref="ProjectPartResponse"/>.</summary>
-    public static ProjectPartResponse ToResponse(this ProjectPart part)
+    public static ProjectPartResponse ToResponse(this ProjectPart part, uint projectVersion)
     {
         return new ProjectPartResponse
         {
+            ProjectVersion = projectVersion,
             Id = part.Id,
             ProjectId = part.ProjectId,
             PartNumber = part.PartNumber,
@@ -77,6 +116,10 @@ public static class MappingExtensions
             FileId = part.FileId,
             FileReference = part.FileReference,
             ThumbnailUrl = part.ThumbnailUrl,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            GlbStoragePath = part.GlbStoragePath,
+            OverlayPaths = new Dictionary<string, string>(part.OverlayPaths),
             ProcessType = part.ProcessType.ToString(),
             MaterialId = part.MaterialId,
             MaterialName = part.MaterialName,
@@ -85,6 +128,26 @@ public static class MappingExtensions
             FinishType = part.FinishType,
             Color = part.Color,
             Tolerance = part.Tolerance,
+            RoughnessCode = part.RoughnessCode,
+            MarkingType = part.MarkingType,
+            MarkingText = part.MarkingText,
+            DfmAcknowledged = part.DfmAcknowledged,
+            HasDfmWarnings = part.HasDfmWarnings,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+            Certificates = [.. part.Certificates],
+            DrawingFiles = part.DrawingFiles.Select(ToAttachmentDto).ToList(),
+            SupplementaryFiles = part.SupplementaryFiles.Select(ToAttachmentDto).ToList(),
+            ProcessConfig = new Dictionary<string, string>(part.ProcessConfig),
+            BodyCount = part.BodyCount,
+            BodiesJson = part.BodiesJson,
+            SelectedBodyIndex = part.SelectedBodyIndex,
             ThreadsInserts = part.ThreadsInserts,
             CustomNotes = part.CustomNotes,
             VolumeCm3 = part.VolumeCm3,
@@ -103,6 +166,36 @@ public static class MappingExtensions
             Status = part.Status.ToString(),
             CreatedAt = part.CreatedAt,
             UpdatedAt = part.UpdatedAt
+        };
+    }
+
+    /// <summary>Maps a persisted attachment to its DTO representation.</summary>
+    public static ProjectPartAttachmentDto ToAttachmentDto(this ProjectPartAttachment attachment)
+    {
+        return new ProjectPartAttachmentDto
+        {
+            FileId = attachment.FileId,
+            FileName = attachment.FileName,
+            StoragePath = attachment.StoragePath,
+            SignedUrl = attachment.SignedUrl,
+            SizeBytes = attachment.SizeBytes,
+            ContentType = attachment.ContentType,
+            UploadedAt = attachment.UploadedAt
+        };
+    }
+
+    /// <summary>Maps an attachment DTO to a persisted attachment value.</summary>
+    public static ProjectPartAttachment ToAttachment(this ProjectPartAttachmentDto attachment)
+    {
+        return new ProjectPartAttachment
+        {
+            FileId = attachment.FileId,
+            FileName = attachment.FileName,
+            StoragePath = attachment.StoragePath,
+            SignedUrl = attachment.SignedUrl,
+            SizeBytes = attachment.SizeBytes,
+            ContentType = attachment.ContentType,
+            UploadedAt = attachment.UploadedAt
         };
     }
 

@@ -332,6 +332,17 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         return client;
     }
 
+    /// <summary>Creates an authenticated HTTP client with the specified permissions and additional claims.</summary>
+    public HttpClient CreateClientWithPermissionsAndClaims(
+        Dictionary<string, string> additionalClaims,
+        params string[] permissions)
+    {
+        var token = CreateTestJwtToken(permissions: permissions, additionalClaims: additionalClaims);
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
     /// <summary>Creates an anonymous (unauthenticated) HTTP client.</summary>
     public HttpClient CreateAnonymousClient() => CreateClient();
 }

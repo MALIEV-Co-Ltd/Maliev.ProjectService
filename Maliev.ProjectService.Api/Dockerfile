@@ -9,7 +9,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-COPY ["NuGet.Config", "."]
+COPY ["nuget.config", "."]
 COPY ["Maliev.ProjectService.Api/Maliev.ProjectService.Api.csproj", "Maliev.ProjectService.Api/"]
 COPY ["Maliev.ProjectService.Application/Maliev.ProjectService.Application.csproj", "Maliev.ProjectService.Application/"]
 COPY ["Maliev.ProjectService.Domain/Maliev.ProjectService.Domain.csproj", "Maliev.ProjectService.Domain/"]
@@ -37,4 +37,8 @@ COPY --chown=app:app --from=publish /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/project/liveness || exit 1
+
 ENTRYPOINT ["dotnet", "Maliev.ProjectService.Api.dll"]

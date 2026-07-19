@@ -34,6 +34,12 @@ public class JobStatusChangedEventConsumer : IConsumer<JobStatusChangedEvent>
     public async Task Consume(ConsumeContext<JobStatusChangedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring JobStatusChangedEvent without payload");
+            return;
+        }
+
         _logger.LogDebug("Received JobStatusChanged: Job {JobId} -> {NewStatus}", payload.JobId, payload.NewStatus);
 
         // Find the part linked to this job
@@ -50,8 +56,8 @@ public class JobStatusChangedEventConsumer : IConsumer<JobStatusChangedEvent>
         var newPartStatus = payload.NewStatus switch
         {
             "InProgress" or "Printing" or "Machining" or "Processing" => PartStatus.InProduction,
-            "QualityCheck" or "Inspection" => PartStatus.QualityCheck,
-            "Approved" or "Complete" or "Completed" => PartStatus.Approved,
+            "QualityCheck" or "Inspection" or "Completed" => PartStatus.QualityCheck,
+            "Approved" or "Complete" => PartStatus.Approved,
             _ => part.Status // keep existing status for unknown transitions
         };
 

@@ -33,7 +33,46 @@ public class OrderCreatedEventConsumer : IConsumer<OrderCreatedEvent>
     public async Task Consume(ConsumeContext<OrderCreatedEvent> context)
     {
         var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("Ignoring OrderCreatedEvent without payload");
+            return;
+        }
+
         _logger.LogInformation("Received OrderCreated for order {OrderId}", payload.OrderId);
+
+        var orderItems = payload.Items?.ToList() ?? [];
+        var sourceLinks = orderItems
+            .Where(item => item.SourceProjectId.HasValue && item.SourceProjectPartId.HasValue)
+            .GroupBy(item => item.SourceProjectId!.Value)
+            .ToList();
+        foreach (var sourceProject in sourceLinks)
+        {
+            var sourceMatchedProject = await _db.Projects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p =>
+                    p.Id == sourceProject.Key &&
+                    p.CustomerId == payload.CustomerId,
+                    context.CancellationToken);
+            if (sourceMatchedProject is null)
+            {
+                continue;
+            }
+
+            var sourcePartLinks = sourceProject
+                .Select(item => (PartId: item.SourceProjectPartId!.Value, OrderItemId: item.ProductId))
+                .ToList();
+            if (sourcePartLinks.Count > 0)
+            {
+                await _projectService.LinkOrderAsync(sourceMatchedProject.Id, payload.OrderId, sourcePartLinks, context.CancellationToken);
+                _logger.LogInformation(
+                    "Linked order {OrderId} to {Count} source-identified parts in project {ProjectNumber}",
+                    payload.OrderId,
+                    sourcePartLinks.Count,
+                    sourceMatchedProject.ProjectNumber);
+                return;
+            }
+        }
 
         // Find project parts that are in Ordered/QuotationAccepted status and
         // belong to the customer who placed this order. Match by QuotationId if available.
@@ -55,8 +94,6 @@ public class OrderCreatedEventConsumer : IConsumer<OrderCreatedEvent>
             .Where(p => p.OrderId == null && p.Status == Domain.Enums.PartStatus.Quoted)
             .OrderBy(p => p.PartNumber)
             .ToList();
-
-        var orderItems = payload.Items?.ToList() ?? [];
 
         var links = unlinkedParts
             .Zip(orderItems, (part, item) => (PartId: part.Id, OrderItemId: item.ProductId))

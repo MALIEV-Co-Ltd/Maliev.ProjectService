@@ -92,6 +92,10 @@ All endpoints are prefixed with `/project/v1/`.
 | POST | `/projects/{id}/accept` | Accept quotation | `project.projects.accept` |
 | GET | `/projects/{id}/status-history` | Get status change history | `project.projects.read` |
 
+### Permission Model
+
+Project permissions are staff/service permissions by default. Tokens that carry a `customer_id` or `customerId` claim are treated as customer-scoped: list/search requests are forced to that customer, create requests must use that customer ID, and project object routes return `403` for projects owned by another customer. Customer-facing flows should continue to use the BFF/portal boundary instead of granting broad project permissions directly.
+
 ### Health Probes
 - Liveness: `GET /project/liveness`
 - Readiness: `GET /project/readiness`

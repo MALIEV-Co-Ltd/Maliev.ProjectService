@@ -29,6 +29,18 @@ public class ProjectPart
     /// <summary>URL to the thumbnail image for display. Null if not yet generated.</summary>
     public string? ThumbnailUrl { get; set; }
 
+    /// <summary>Raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Raw GCS path for the GLB viewer artifact.</summary>
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
+
     // --- Manufacturing Configuration ---
 
     /// <summary>Selected manufacturing process for this part.</summary>
@@ -54,6 +66,66 @@ public class ProjectPart
 
     /// <summary>Dimensional tolerance specification (e.g., "+/- 0.1mm", "ISO 2768-m").</summary>
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Marking type selected for this part.</summary>
+    public string? MarkingType { get; set; }
+
+    /// <summary>Marking text selected for this part.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>Whether DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
+
+    /// <summary>Whether DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
+
+    /// <summary>Whether this part requires threaded holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Threaded hole count.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>Whether this part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type selected for this part.</summary>
+    public string? InsertType { get; set; }
+
+    /// <summary>Insert count.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>Whether this part should be individually bagged and tagged.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level selected for this part.</summary>
+    public string? InspectionLevel { get; set; }
+
+    /// <summary>Requested certificates for this part.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Drawing attachments for this part.</summary>
+    public List<ProjectPartAttachment> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary attachments for this part.</summary>
+    public List<ProjectPartAttachment> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
 
     /// <summary>Any thread inserts or special fastener requirements.</summary>
     public string? ThreadsInserts { get; set; }
@@ -133,4 +205,31 @@ public class ProjectPart
 
     /// <summary>Parent project.</summary>
     public Project? Project { get; set; }
+}
+
+/// <summary>
+/// Attachment metadata persisted with a project part.
+/// </summary>
+public class ProjectPartAttachment
+{
+    /// <summary>UploadService file ID for the attachment.</summary>
+    public Guid? FileId { get; set; }
+
+    /// <summary>Original file name for display.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Raw GCS storage path for the attachment.</summary>
+    public string? StoragePath { get; set; }
+
+    /// <summary>Signed URL if one has been resolved by a caller.</summary>
+    public string? SignedUrl { get; set; }
+
+    /// <summary>Attachment size in bytes.</summary>
+    public long? SizeBytes { get; set; }
+
+    /// <summary>MIME content type.</summary>
+    public string? ContentType { get; set; }
+
+    /// <summary>UTC upload timestamp.</summary>
+    public DateTime? UploadedAt { get; set; }
 }

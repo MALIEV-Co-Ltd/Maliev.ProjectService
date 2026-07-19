@@ -1,6 +1,7 @@
 using Maliev.ProjectService.Domain.Entities;
 using Maliev.ProjectService.Infrastructure.Persistence.Configurations;
 using Maliev.Aspire.ServiceDefaults.Database;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.ProjectService.Infrastructure.Persistence;
@@ -26,6 +27,10 @@ public class ProjectDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectPartConfiguration());
